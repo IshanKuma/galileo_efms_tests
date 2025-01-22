@@ -1,0 +1,43 @@
+{
+    "PM": "PMX", 
+    "THRESHOLD_STORAGE_UTILIZATION": 85,
+    "DDS_PATH": "/mnt/dds/d",
+    "SPATIAL_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial",
+    "IS_RETENTION_POLICY_ENABLED": true,
+    "RETENTION_PERIOD_IN_HOURS": 24,
+    "VIDEO_RETENTION_POLICY": {
+      "VIDEO_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial/Videos",
+      "IS_RETENTION_POLICY_ENABLED": true,
+      "RETENTION_PERIOD_IN_HOURS": 24,
+      "FILE_EXTENSIONS": ["mp4", "mkv"]
+    },
+    "PARQUET_RETENTION_POLICY": {
+      "PARQUET_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial/Analysis",
+      "IS_RETENTION_POLICY_ENABLED": true,
+      "RETENTION_PERIOD_IN_HOURS": 24,
+      "FILE_EXTENSIONS": ["parquet"]
+    },
+    "DIAGNOSTIC_RETENTION_POLICY": {
+      "DIAGNOSTIC_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial/Diagnostics",
+      "IS_RETENTION_POLICY_ENABLED": true,
+      "RETENTION_PERIOD_IN_HOURS": 24,
+      "FILE_EXTENSIONS": ["csv", "json", "tx"]
+    },
+    "LOG_RETENTION_POLICY": {
+      "LOG_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial/Logs",
+      "IS_RETENTION_POLICY_ENABLED": true,
+      "RETENTION_PERIOD_IN_HOURS": 24,
+      "FILE_EXTENSIONS": ["log"]
+    },
+    "VIDEO_CLIPS_RETENTION_POLICY": {
+      "VIDEO_CLIPS_PATH": "/mnt/dds/d/Lam/Data/PMX/Spatial/VideoClips",
+      "IS_RETENTION_POLICY_ENABLED": true,
+      "RETENTION_PERIOD_IN_HOURS": 24,
+      "FILE_EXTENSIONS": ["mp4", "mkv"]
+    },
+    "LOG_DIRECTORY": "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/",
+    "LOG_SOURCE": "EFMS",
+    "LOG_FILE": "DDS_Retention.log",
+    "LOG_FILE_PATH": "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/DDS_Retention.log"
+  }
+  
