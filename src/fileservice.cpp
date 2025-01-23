@@ -42,12 +42,36 @@ std::string FileService::check_path_type(const std::string& path) {
  * throws std::runtime_error if directory already exists
  */
 void FileService::create_directory(const std::string& path) {
-    if (!fs::exists(path)) {
-        fs::create_directories(path);
-    } else {
-        throw std::runtime_error("Directory already exists.");
+    try {
+        if (!fs::exists(path)) {
+            // Create directories
+            fs::create_directories(path);
+
+            // Set owner permissions (read, write, execute)
+            fs::permissions(
+                path, 
+                fs::perms::owner_all,  // Owner: Read, Write, Execute
+                fs::perm_options::add  // Add these permissions
+            );
+
+            std::cout << "Directory created successfully: " << path << std::endl;
+        } else {
+            // Directory exists, do nothing
+            std::cout << "Directory already exists: " << path << std::endl;
+        }
+    } catch (const fs::filesystem_error& e) {
+        // Log and rethrow filesystem-specific errors
+        std::cerr << "Filesystem error: " << e.what() << " [" << e.path1() << "]" << std::endl;
+        throw;
+    } catch (const std::exception& e) {
+        // Log and rethrow generic exceptions
+        std::cerr << "Error: " << e.what() << std::endl;
+        throw;
     }
 }
+
+
+
 
 /**
  * Lists all files and directories in the specified path (non-recursive)
@@ -130,18 +154,32 @@ bool FileService::is_directory_empty(const std::string& directory) {
  */
 bool FileService::check_directory_permissions(const std::string& path, Permission permission) {
     try {
-        if (permission == Permission::DELETE) {
-            std::ofstream test_file(path + "/test_permission_check.txt");
-            if (test_file.is_open()) {
-                test_file.close();
-                fs::remove(path + "/test_permission_check.txt");
-                return true;
-            }
+        // Ensure path exists
+        if (!fs::exists(path)) {
+            std::cerr << "Path does not exist: " << path << std::endl;
+            return false;
         }
-    } catch (const std::exception& e) {
-        std::cerr << "Error checking permissions: " << e.what() << std::endl;
+
+        // Get current file permissions
+        fs::perms current_perms = fs::status(path).permissions(); // Add semicolon here
+
+        switch (permission) {
+            case Permission::DELETE: 
+                return (current_perms & fs::perms::owner_write) != fs::perms::none;
+            case Permission::WRITE:
+                return (current_perms & fs::perms::owner_write) != fs::perms::none;
+            case Permission::READ:
+                return (current_perms & fs::perms::owner_read) != fs::perms::none;
+            case Permission::EXECUTE:
+                return (current_perms & fs::perms::owner_exec) != fs::perms::none;
+            default:
+                return false;
+        }
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "Permission check error: " << e.what() << std::endl;
+        return false;
     }
-    return false;
 }
 
 /**
@@ -204,8 +242,32 @@ bool FileService::check_file_permissions(const std::string& filename, Permission
  * Note: This is Unix/Linux specific implementation
  */
 void FileService::copy_files(const std::string& source, const std::string& destination, int bandwidth_limit) {
-    std::string command = "rsync -av --bwlimit=" + std::to_string(bandwidth_limit) + " " + source + " " + destination;
-    system(command.c_str());
+    try {
+        // Create parent directory of destination
+        std::string dest_parent_dir = fs::path(destination).parent_path().string();
+        std::cout << "dest_parent_dir" << dest_parent_dir << std::endl;
+        // if (check_directory_permissions(dest_parent_dir, Permission::WRITE)) {
+        create_directory(dest_parent_dir);
+        // }
+
+        // Construct rsync command 
+        std::string command = "rsync -av --bwlimit=" + std::to_string(bandwidth_limit) + 
+                              " \"" + source + "\" \"" + destination + "\"";
+
+        std::cout << "Copying files: " << command << std::endl;
+
+        // Execute command and check result
+        int result = std::system(command.c_str());
+        if (result != 0) {
+            throw std::runtime_error("File copy failed with exit code: " + std::to_string(result));
+        }
+
+        std::cout << "Files copied successfully." << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Copy error: " << e.what() << std::endl;
+        throw;
+    }
 }
 
 /**
@@ -305,7 +367,7 @@ float FileService::get_file_age_in_hours(const std::string& filename) {
     struct stat file_stat;
     stat(filename.c_str(), &file_stat);
     float file_age_seconds = time(NULL) - file_stat.st_mtime;
-    std::cout << "file_age_seconds" << file_age_seconds << std::endl;
+    // std::cout << "file_age_seconds" << file_age_seconds << std::endl;
     return file_age_seconds / 3600;
 }
 
