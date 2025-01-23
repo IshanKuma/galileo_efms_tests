@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <vecowretentionpolicy.hpp>
 /**
  * brief Global file service instance for handling file operations
  * 
@@ -162,11 +163,11 @@ void ArchivalController::startNormalPipeline() {
     std::cout << "Normal Pipeline Started for archival" << std::endl;
 
     auto filePaths = getAllFilePaths();
-    std::cout << "getAllFilePaths get called" << std::endl;
+    // std::cout << "getAllFilePaths get called" << std::endl;
     for (const auto& filePath : filePaths) {
-        std::cout << "inside for loop" << std::endl;
+        // std::cout << "inside for loop" << std::endl;
         auto [files, directories] = fileService.read_directory_recursively(filePath);
-        std::cout << "read_directory_recursively" << std::endl;
+        // std::cout << "read_directory_recursively" << std::endl;
         for (const auto& file : files) {
             if (isFileEligibleForArchival(file)) {
                 if (!fileService.is_mounted_drive_accessible(archivalPolicy.at("DDS_PATH"))) {
@@ -358,7 +359,7 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
     nlohmann::json data;
     try {
         file >> data;
-        std::cout << "Archival Status JSON exported" << std::endl;
+        // std::cout << "Archival Status JSON exported" << std::endl;
 
         if (filePath.find("Videos") != std::string::npos) {
             return data.value("VideosArchival", false);
@@ -378,26 +379,30 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
     return false;
 }
 
-bool ArchivalController::isFileEligibleForDeletion(const std::string& filePath) {
-    double fileAge = checkFileArchivalPolicy(filePath);
-    double retentionPeriod;
+bool ArchivalController::isFileEligibleForDeletion(const std::string& filePath) {     
+   double fileAge = checkFileArchivalPolicy(filePath);     
+   double retentionPeriod;      
 
-    if (filePath.find("Videos") != std::string::npos) {
-        retentionPeriod = archivalPolicy["VIDEO_RETENTION_POLICY"]["RETENTION_PERIOD_IN_HOURS"].get<double>();
-        std::cout << "----------retentionPeriod-------" << retentionPeriod << std::endl;
-    } else if (filePath.find("Analysis") != std::string::npos) {
-        retentionPeriod = archivalPolicy["PARQUET_RETENTION_POLICY"]["RETENTION_PERIOD_IN_HOURS"].get<double>();
-    } else if (filePath.find("Diagnostics") != std::string::npos) {
-        retentionPeriod = archivalPolicy["DIAGNOSTIC_RETENTION_POLICY"]["RETENTION_PERIOD_IN_HOURS"].get<double>();
-    } else if (filePath.find("Logs") != std::string::npos) {
-        retentionPeriod = archivalPolicy["LOG_RETENTION_POLICY"]["RETENTION_PERIOD_IN_HOURS"].get<double>();
-    } else if (filePath.find("VideoClips") != std::string::npos) {
-        retentionPeriod = archivalPolicy["VIDEO_CLIPS_RETENTION_POLICY"]["RETENTION_PERIOD_IN_HOURS"].get<double>();
-    } else {
-        return false;
-    }
+   if (filePath.find("Videos") != std::string::npos) {         
+       retentionPeriod = vecowretentionpolicy::VIDEO_RETENTION_POLICY.retentionPeriodInHours;
+    //    std::cout << "file age: "<< fileAge << std::endl;
+    //    std::cout << "retentionperiod Videos: "<< retentionPeriod << std::endl;
+   } else if (filePath.find("Analysis") != std::string::npos) {         
+       retentionPeriod = vecowretentionpolicy::PARQUET_RETENTION_POLICY.retentionPeriodInHours;
+   } else if (filePath.find("Diagnostics") != std::string::npos) {         
+       retentionPeriod = vecowretentionpolicy::DIAGNOSTIC_RETENTION_POLICY.retentionPeriodInHours;
+   } else if (filePath.find("Logs") != std::string::npos) {         
+       retentionPeriod = vecowretentionpolicy::LOG_RETENTION_POLICY.retentionPeriodInHours;
+   } else if (filePath.find("VideoClips") != std::string::npos) {         
+       retentionPeriod = vecowretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY.retentionPeriodInHours;
+   } else {         
+       return false;     
+   }      
+//    std::cout << "file age: "<< fileAge << std::endl;
+//    std::cout << "retentionperiod: "<< retentionPeriod << std::endl;
 
-    return fileAge > retentionPeriod;
+
+   return fileAge > retentionPeriod; 
 }
 
 /**
