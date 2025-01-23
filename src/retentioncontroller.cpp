@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <algorithm> // Add this header
+#include <ddsretentionpolicy.hpp>
 
 RetentionController::RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
                                          const std::string& logFilePath, 
@@ -118,6 +120,7 @@ void RetentionController::startNormalPipeline() {
     try {
         auto filepaths = getAllFilePaths();
         for (const auto& filePath : filepaths) {
+            std::cout << "Deleting File in retention policy: " << filePath << std::endl;
             auto [files, directories] = fileService.read_directory_recursively(filePath);
             for (const auto& file : files) {
                 if (isFileEligibleForDeletion(file) && checkFilePermissions(file)) {
@@ -134,50 +137,27 @@ void RetentionController::startNormalPipeline() {
 
 std::vector<std::string> RetentionController::getAllFilePaths() {
     std::vector<std::string> filepaths;
-    const std::vector<std::string> policies = {
-        "VIDEO_RETENTION_POLICY", "PARQUET_RETENTION_POLICY", "DIAGNOSTIC_RETENTION_POLICY",
-        "LOG_RETENTION_POLICY", "VIDEO_CLIPS_RETENTION_POLICY"
+    const std::vector<std::string> policyKeys = {
+        "VIDEO_RETENTION_POLICY_PATH",
+        "PARQUET_RETENTION_POLICY_PATH", 
+        "DIAGNOSTIC_RETENTION_POLICY_PATH",
+        "LOG_RETENTION_POLICY_PATH", 
+        "VIDEO_CLIPS_RETENTION_POLICY_PATH"
     };
 
-    for (const auto& policy : policies) {
+    for (const auto& policyKey : policyKeys) {
         try {
-            // Use find() instead of at() to avoid throwing an exception if the policy is missing
-            auto policyIt = retentionPolicy.find(policy);
-            if (policyIt != retentionPolicy.end()) {
-                const auto& policyMap = policyIt->second;
-
-                // Check for the specific path under each policy
-                if (policy == "VIDEO_RETENTION_POLICY") {
-                    auto videoPathIt = policyMap.find("VIDEO_PATH");
-                    if (videoPathIt != policyMap.end()) {
-                        filepaths.push_back(videoPathIt->second);
-                    }
-                } else if (policy == "PARQUET_RETENTION_POLICY") {
-                    auto parquetPathIt = policyMap.find("PARQUET_PATH");
-                    if (parquetPathIt != policyMap.end()) {
-                        filepaths.push_back(parquetPathIt->second);
-                    }
-                } else if (policy == "DIAGNOSTIC_RETENTION_POLICY") {
-                    auto diagnosticPathIt = policyMap.find("DIAGNOSTIC_PATH");
-                    if (diagnosticPathIt != policyMap.end()) {
-                        filepaths.push_back(diagnosticPathIt->second);
-                    }
-                } else if (policy == "LOG_RETENTION_POLICY") {
-                    auto logPathIt = policyMap.find("LOG_PATH");
-                    if (logPathIt != policyMap.end()) {
-                        filepaths.push_back(logPathIt->second);
-                    }
-                } else if (policy == "VIDEO_CLIPS_RETENTION_POLICY") {
-                    auto videoClipsPathIt = policyMap.find("VIDEO_CLIPS_PATH");
-                    if (videoClipsPathIt != policyMap.end()) {
-                        filepaths.push_back(videoClipsPathIt->second);
-                    }
-                }
+            auto pathIt = retentionPolicy.find(policyKey);
+            if (pathIt != retentionPolicy.end()) {
+                filepaths.push_back(pathIt->second.at("value"));
+                std::cout << policyKey << ": " << pathIt->second.at("value") << std::endl;
             }
         } catch (const std::exception& e) {
-            std::cerr << "Error retrieving file paths for policy: " << policy << " - " << e.what() << std::endl;
+            std::cerr << "Error retrieving file path for: " << policyKey 
+                      << " - " << e.what() << std::endl;
         }
     }
+    
     return filepaths;
 }
 
@@ -228,26 +208,72 @@ bool RetentionController::checkRetentionPolicy() {
 }
 
 bool RetentionController::isFileEligibleForDeletion(const std::string& filePath) {
-    try {
-        std::string retentionPolicyKey;
+    const std::vector<std::pair<std::string, std::string>> policyMappings = {
+        {"/Videos/", "VIDEO_RETENTION_POLICY"},
+        {"/Analysis/", "PARQUET_RETENTION_POLICY"},
+        {"/Diagnostics/", "DIAGNOSTIC_RETENTION_POLICY"},
+        {"/Logs/", "LOG_RETENTION_POLICY"},
+        {"/VideoClips/", "VIDEO_CLIPS_RETENTION_POLICY"}
+    };
 
-        if (filePath.find("/Videos/") != std::string::npos) {
-            retentionPolicyKey = "VIDEO_RETENTION_POLICY";
-        } else if (filePath.find("/Analysis/") != std::string::npos) {
-            retentionPolicyKey = "PARQUET_RETENTION_POLICY";
-        } else if (filePath.find("/Diagnostics/") != std::string::npos) {
-            retentionPolicyKey = "DIAGNOSTIC_RETENTION_POLICY";
-        } else if (filePath.find("/Logs/") != std::string::npos) {
-            retentionPolicyKey = "LOG_RETENTION_POLICY";
-        } else if (filePath.find("/VideoClips/") != std::string::npos) {
-            retentionPolicyKey = "VIDEO_CLIPS_RETENTION_POLICY";
-        } else {
+    try {
+        // Find matching policy based on file path
+        auto policyIt = std::find_if(policyMappings.begin(), policyMappings.end(),
+            [&filePath](const auto& mapping) {
+                return filePath.find(mapping.first) != std::string::npos;
+            });
+
+        if (policyIt == policyMappings.end()) {
             return false;
         }
 
+        // Get retention policy details
+        ddsretentionpolicy retentionPolicyObj;
+        auto policyDict = retentionPolicyObj.to_dict();
+
+        // Find the specific policy's retention period
+        std::string policyName = policyIt->second;
+        std::string retentionPolicyPath = policyName + "_PATH";
+        
+        // Check if the specific policy path exists
+        auto pathIt = policyDict.find(retentionPolicyPath);
+        if (pathIt == policyDict.end()) {
+            std::cerr << "Policy path not found: " << retentionPolicyPath << std::endl;
+            return false;
+        }
+
+        // Get the retention period from the corresponding RetentionPolicy
+        // std::string policyKey = policyName;
+        // if (policyDict.find(policyKey) == policyDict.end()) {
+        //     std::cerr << "Policy not found: " << policyKey << std::endl;
+        //     return false;
+        // }
+
+        // Use the retention period from the specific policy
+        int retentionPeriod = 0;
+        if (filePath.find("Videos") != std::string::npos) {
+            retentionPeriod = ddsretentionpolicy::VIDEO_RETENTION_POLICY.retentionPeriodInHours;
+        } else if (filePath.find("Analysis") != std::string::npos) {
+            retentionPeriod = ddsretentionpolicy::PARQUET_RETENTION_POLICY.retentionPeriodInHours;
+        }else if (filePath.find("Diagnostics") != std::string::npos) {
+            retentionPeriod = ddsretentionpolicy::DIAGNOSTIC_RETENTION_POLICY.retentionPeriodInHours;
+        } else if (filePath.find("Logs") != std::string::npos) {
+            retentionPeriod = ddsretentionpolicy::LOG_RETENTION_POLICY.retentionPeriodInHours;
+        } else if (filePath.find("VideoClips") != std::string::npos) {
+            retentionPeriod = ddsretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY.retentionPeriodInHours;
+        }
+
+        // Get file age and compare with retention period
         int fileAge = fileService.get_file_age_in_hours(filePath);
-        int retentionPeriod = std::stoi(retentionPolicy.at(retentionPolicyKey).at("RETENTION_PERIOD_IN_HOURS"));
+
+        // Optional logging for debugging
+        std::cout << "File Path: " << filePath << std::endl;
+        std::cout << "File Age: " << fileAge << " hours" << std::endl;
+        std::cout << "Retention Period: " << retentionPeriod << " hours" << std::endl;
+
+        // Determine if file is eligible for deletion
         return fileAge > retentionPeriod;
+
     } catch (const std::exception& e) {
         std::cerr << "Error checking file eligibility: " << e.what() << std::endl;
         return false;
