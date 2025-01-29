@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include "fileservice.hpp"
+#include "loggingservice.hpp"
 
 class RetentionController {
 public:
@@ -23,9 +24,11 @@ private:
     // Member variables
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> retentionPolicy;
     FileService fileService;
-
+    LoggingService* logger;
+    std::string source;
+    std::string logFilePath;
     // Private methods
-    bool validatePolicy();
+    // bool validatePolicy();
     // bool validatePolicy(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& policies); // With arguments
 
     bool checkRetentionPolicy();

@@ -7,10 +7,10 @@ const std::int64_t ddsretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 85;  // O
 const std::string ddsretentionpolicy::DDS_PATH = "/mnt/storage/dds/d";
 const std::string ddsretentionpolicy::SPATIAL_PATH = DDS_PATH + "/Lam/Data/" + "PMX" + "/Spatial";
 const bool ddsretentionpolicy::IS_RETENTION_POLICY_ENABLED = true;
-const int ddsretentionpolicy::RETENTION_PERIOD_IN_HOURS = 24;
+const int ddsretentionpolicy::RETENTION_PERIOD_IN_HOURS = 0;
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::VIDEO_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Videos", true, 24, {"mp4", "mkv"}
+    SPATIAL_PATH + "/Videos", true, 1, {"mp4", "mkv"}
 };
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::PARQUET_RETENTION_POLICY = {
@@ -32,7 +32,7 @@ ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::VIDEO_CLIPS_RETENTION_PO
 const std::string ddsretentionpolicy::LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/";
 const std::string ddsretentionpolicy::LOG_SOURCE = "EFMS";
 const std::string ddsretentionpolicy::LOG_FILE = "DDS_Retention.log";
-const std::string ddsretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/DDS_Retention.log";
+const std::string ddsretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS";
 
 const std::string ddsretentionpolicy::PM = "PMX";
 
