@@ -28,6 +28,6 @@ make
 
 # Run the executable
 echo "Running executable..."
-./EFMS_CPP_CODEBASE
+sudo ./EFMS_CPP_CODEBASE
 
 echo "Build and execution completed successfully."

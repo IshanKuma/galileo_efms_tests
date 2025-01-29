@@ -9,10 +9,10 @@ const std::string vecowretentionpolicy::MOUNTED_PATH = "/mnt/storage";
 const std::string vecowretentionpolicy::DDS_PATH = "/mnt/storage/dds/d";
 const std::string vecowretentionpolicy::SPATIAL_PATH = MOUNTED_PATH + "/Lam/Data/" + "PMX" + "/Spatial";
 const bool vecowretentionpolicy::IS_RETENTION_POLICY_ENABLED = true;
-const int vecowretentionpolicy::RETENTION_PERIOD_IN_HOURS = 24 * 4;
+const int vecowretentionpolicy::RETENTION_PERIOD_IN_HOURS = 10 * 4;
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::VIDEO_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Videos", true, 24 * 4, {"mp4", "mkv"}
+    SPATIAL_PATH + "/Videos", true, 1, {"mp4", "mkv"}
 };
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::PARQUET_RETENTION_POLICY = {
@@ -34,7 +34,7 @@ vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::VIDEO_CLIPS_RETENTIO
 const std::string vecowretentionpolicy::LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS";
 const std::string vecowretentionpolicy::LOG_SOURCE = "EFMS";
 const std::string vecowretentionpolicy::LOG_FILE = "VECOW_Retention_Archival.log";
-const std::string vecowretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/VECOW_Retention_Archival.log";
+const std::string vecowretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/";
 
 const std::string vecowretentionpolicy::PM = "PMX";
 
