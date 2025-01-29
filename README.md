@@ -1,7 +1,7 @@
-# GALILEO EPMS
+# GALILEO EFMS
 
 ## Overview
-GALILEO EPMS is a C++ based system that handles enterprise policy management with a focus on data retention and archival capabilities.
+GALILEO EFMS is a C++ based system that handles files management with a focus on retention and archival capabilities.
 
 ## Features
 - Archival policy implementation
@@ -39,8 +39,7 @@ sudo apt-get install libpqxx-dev
 ### Installation
 ```bash
 git clone <repository-url>
-cd galileo-epms
-make
+cd galileo-efms/scripts
 ```
 
 ## Running the Application
@@ -58,7 +57,7 @@ To run the test suite:
 ```
 
 ## Development
-The project follows a modular architecture with separate controllers for different functionalities:
+The project follows a modular architecture with separate controllers and services for different functionalities:
 - Archival Controller
 - Retention Controller
 - File Service
