@@ -3,16 +3,16 @@
 #include <unordered_map>
 
 // const int vecowretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 75;
-const std::int64_t vecowretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 85;  // Or use std::int64_t
+const std::int64_t vecowretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 75;  // Or use std::int64_t
 
 const std::string vecowretentionpolicy::MOUNTED_PATH = "/mnt/storage";
-const std::string vecowretentionpolicy::DDS_PATH = "/mnt/storage/dds/d";
+const std::string vecowretentionpolicy::DDS_PATH = "/mnt/dds/d";
 const std::string vecowretentionpolicy::SPATIAL_PATH = MOUNTED_PATH + "/Lam/Data/" + "PMX" + "/Spatial";
 const bool vecowretentionpolicy::IS_RETENTION_POLICY_ENABLED = true;
 const int vecowretentionpolicy::RETENTION_PERIOD_IN_HOURS = 10 * 4;
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::VIDEO_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Videos", true, 1, {"mp4", "mkv"}
+    SPATIAL_PATH + "/Videos", true, 24*4, {"mp4", "mkv"}
 };
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::PARQUET_RETENTION_POLICY = {
@@ -20,7 +20,7 @@ vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::PARQUET_RETENTION_PO
 };
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::DIAGNOSTIC_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Diagnostics", true, 24 * 30, {"csv", "json", "tx"}
+    SPATIAL_PATH + "/Diagnostics", true, 24 * 30, {"csv", "json", "txt"}
 };
 
 vecowretentionpolicy::RetentionPolicy vecowretentionpolicy::LOG_RETENTION_POLICY = {
