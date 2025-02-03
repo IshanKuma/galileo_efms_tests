@@ -4,29 +4,29 @@
 
 // const int ddsretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 85;
 const std::int64_t ddsretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 85;  // Or use std::int64_t
-const std::string ddsretentionpolicy::DDS_PATH = "/mnt/storage/dds/d";
+const std::string ddsretentionpolicy::DDS_PATH = "/mnt/dds/d";
 const std::string ddsretentionpolicy::SPATIAL_PATH = DDS_PATH + "/Lam/Data/" + "PMX" + "/Spatial";
 const bool ddsretentionpolicy::IS_RETENTION_POLICY_ENABLED = true;
 const int ddsretentionpolicy::RETENTION_PERIOD_IN_HOURS = 0;
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::VIDEO_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Videos", true, 1, {"mp4", "mkv"}
+    SPATIAL_PATH + "/Videos", true, 24*4, {"mp4", "mkv"}
 };
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::PARQUET_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Analysis", true, 24, {"parquet"}
+    SPATIAL_PATH + "/Analysis", true, 24*4, {"parquet"}
 };
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::DIAGNOSTIC_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Diagnostics", true, 24, {"csv", "json", "tx"}
+    SPATIAL_PATH + "/Diagnostics", true, 24*4, {"csv", "json", "txt"}
 };
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::LOG_RETENTION_POLICY = {
-    SPATIAL_PATH + "/Logs", true, 24, {"log"}
+    SPATIAL_PATH + "/Logs", true, 24*4, {"log"}
 };
 
 ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY = {
-    SPATIAL_PATH + "/VideoClips", true, 24, {"mp4", "mkv"}
+    SPATIAL_PATH + "/VideoClips", true, 24*4, {"mp4", "mkv"}
 };
 
 const std::string ddsretentionpolicy::LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/";
