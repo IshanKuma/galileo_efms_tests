@@ -1,7 +1,7 @@
 {
     "VideosArchival": true,
-    "AnalysisArchival": false,
-    "LogsArchival": false,
-    "VideoclipsArchival": false,
-    "DiagnosticsArchival": false
+    "AnalysisArchival": true,
+    "LogsArchival": true,
+    "VideoclipsArchival": true,
+    "DiagnosticsArchival": true
 }

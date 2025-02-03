@@ -5,12 +5,8 @@
 #include <vector>
 #include <unordered_map>
 #include <nlohmann/json.hpp>
-
-// Include dependencies
-// #include "../services/headers/CustomLogger.hpp"
 #include "fileservice.hpp"
-// #include "../src/Archival_test.cpp"
-// #include "../services/headers/DatabaseService.hpp"
+#include "loggingservice.hpp"
 
 // ArchivalController class declaration
 class ArchivalController {
@@ -24,10 +20,14 @@ public:
     void startNormalPipeline();
     void stopPipeline(const std::vector<std::string>& directories);
     FileService fileService;
+    
+    // logger = LoggingService::getInstance(source, logFilePath);
 private:
     // Member variables
     nlohmann::json archivalPolicy;
-
+    LoggingService* logger;
+    std::string source;
+    std::string logFilePath;
     // // CustomLogger customLogger;
     // DatabaseService databaseService;
 

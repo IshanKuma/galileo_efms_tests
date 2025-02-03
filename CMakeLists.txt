@@ -17,6 +17,7 @@ set(SOURCES
     src/retentioncontroller.cpp
     src/vecowretentionpolicy.cpp    # Added missing source
     src/ddsretentionpolicy.cpp      # Added missing source
+    src/loggingservice.cpp
 )
 
 # Add header files
@@ -27,6 +28,7 @@ set(HEADERS
     include/retentioncontroller.hpp
     include/vecowretentionpolicy.hpp  # Added missing header
     include/ddsretentionpolicy.hpp    # Added missing header
+    include/loggingservice.hpp
 )
 
 # Create executable
