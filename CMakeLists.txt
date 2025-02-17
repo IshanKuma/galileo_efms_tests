@@ -8,53 +8,73 @@ project(EFMS_CPP_CODEBASE)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add source files
-set(SOURCES
-    src/archivalcontroller.cpp
-    src/databaseservice.cpp
-    src/fileservice.cpp
-    src/main.cpp
-    src/retentioncontroller.cpp
-    src/vecowretentionpolicy.cpp    # Added missing source
-    src/ddsretentionpolicy.cpp      # Added missing source
-    src/loggingservice.cpp
-)
-
-# Add header files
-set(HEADERS
-    include/archivalcontroller.hpp
-    include/databaseservice.hpp
-    include/fileservice.hpp
-    include/retentioncontroller.hpp
-    include/vecowretentionpolicy.hpp  # Added missing header
-    include/ddsretentionpolicy.hpp    # Added missing header
-    include/loggingservice.hpp
-)
-
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+# Add path to find installed utilities library
+set(CMAKE_PREFIX_PATH "/usr/local/lib")
 
 # Find required packages
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PQXX REQUIRED libpqxx)
+find_package(nlohmann_json REQUIRED)
+
+# Find additional required packages that utilities_lib depends on
+pkg_check_modules(MODBUS REQUIRED libmodbus)
+pkg_check_modules(ZMQ REQUIRED libzmq)
+
+# Find utilities library
+find_library(UTILITIES_LIB utilities_lib REQUIRED)
+
+# Add source files (removed duplicates that are in the utilities library)
+set(SOURCES
+    src/archivalcontroller.cpp
+    src/main.cpp
+    src/retentioncontroller.cpp
+    src/vecowretentionpolicy.cpp
+    src/ddsretentionpolicy.cpp
+)
+
+# Add header files
+set(HEADERS
+    include/archivalcontroller.hpp
+    include/retentioncontroller.hpp
+    include/vecowretentionpolicy.hpp
+    include/ddsretentionpolicy.hpp
+)
+
+# Create executable
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Add include directories
 target_include_directories(${PROJECT_NAME} 
     PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${PQXX_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${PQXX_INCLUDE_DIRS}
+        ${MODBUS_INCLUDE_DIRS}
+        ${ZMQ_INCLUDE_DIRS}
+        /usr/local/include  # Add this to find utilities headers
 )
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-    ${CMAKE_THREAD_LIBS_INIT}
-    ${PQXX_LIBRARIES}
+        ${CMAKE_THREAD_LIBS_INIT}
+        ${PQXX_LIBRARIES}
+        ${MODBUS_LIBRARIES}
+        ${ZMQ_LIBRARIES}
+        nlohmann_json::nlohmann_json
+        ${UTILITIES_LIB}
 )
 
-# Add library directories if needed
-link_directories(${PQXX_LIBRARY_DIRS})
+# Add library directories
+link_directories(
+    ${PQXX_LIBRARY_DIRS}
+    ${MODBUS_LIBRARY_DIRS}
+    ${ZMQ_LIBRARY_DIRS}
+)
 
 # Add compiler flags from pkg-config
-target_compile_options(${PROJECT_NAME} PRIVATE ${PQXX_CFLAGS_OTHER})
+target_compile_options(${PROJECT_NAME} PRIVATE 
+    ${PQXX_CFLAGS_OTHER}
+    ${MODBUS_CFLAGS_OTHER}
+    ${ZMQ_CFLAGS_OTHER}
+)
