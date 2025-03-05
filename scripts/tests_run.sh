@@ -28,6 +28,6 @@ make
 
 # Run the executable
 echo "Running executable..."
-sudo ./retentiontest
+sudo ./test_retention
 
 echo "Build and execution completed successfully."
