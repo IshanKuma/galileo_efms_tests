@@ -20,11 +20,10 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
     : archivalPolicy(archivalPolicy), source(source), logFilePath(logFilePath) {
     try {
         logger = LoggingService::getInstance(source, logFilePath);
-        
-        logger->info("ArchivalController initialization started", nlohmann::json{{"ArchivalController started"}}, "EFMS");
+        logger->info("ArchivalController initialization started", "");
         
         if (!archivalPolicy.is_object()) {
-            logger->critical("Invalid archival policy: not a JSON object", nlohmann::json{{"invalid json object"}}, "EFMS", true, "05001");
+            logger->critical("Invalid archival policy: not a JSON object", "");
             throw std::runtime_error("Invalid archival policy: not a JSON object");
         }
 
@@ -36,7 +35,7 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
 
         for (const auto& [field, expected_type] : requiredFields) {
             if (!archivalPolicy.contains(field)) {
-                logger->critical("Missing required field: " + field, nlohmann::json{{"Required fileds missing"}}, "EFMS", true, "05001");
+                logger->critical("Missing required field: " + field, "");
                 throw std::runtime_error("Missing required field in archival policy: " + field);
             }
         }
@@ -44,18 +43,18 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
         this->archivalPolicy = nlohmann::json(archivalPolicy);
         
     } catch (const std::exception& e) {
-        logger->critical("Initialization failed", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
+        logger->critical("Initialization failed", e.what());
         throw;
     }
 }
 
 void ArchivalController::applyArchivalPolicy() {
     if (checkArchivalPolicy()) {
-        logger->info("Starting max utilization pipeline", nlohmann::json{{"status", "Storage threshold exceeded"}}, "EFMS");
+        logger->info("Starting max utilization pipeline", "Storage threshold exceeded");
         startMaxUtilizationPipeline();
     } else {
         startNormalPipeline();
-        logger->info("Starting Normal utilization pipeline", nlohmann::json{{"Starting the normal pipeline"}}, "EFMS");
+        logger->info("Starting Normal utilization pipeline","");
     }
 }
 
@@ -84,17 +83,13 @@ void ArchivalController::startNormalPipeline() {
         for (const auto& file : files) {
             if (isFileEligibleForArchival(file)) {
                 if (!fileService.is_mounted_drive_accessible(archivalPolicy.at("DDS_PATH"))) {
-                    logger->critical("DDS path not accessible", 
-                        nlohmann::json{{"DDS_PATH", archivalPolicy.at("DDS_PATH").get<std::string>()}},
-                        "EFMS", false, "05001");
+                    logger->critical("DDS path not accessible", archivalPolicy.at("DDS_PATH").get<std::string>());
                     return;
                 }
 
                 auto destinationPath = getDestinationPath(file);
                 if (!isFileArchivedToDDS(file)) {
-                    logger->info("Archiving file", 
-                        nlohmann::json{{"sourceFile", file}, {"destination", destinationPath}},
-                        "EFMS", false, "0");
+                    logger->info("Archiving file", file + " to " + destinationPath);
                     fileService.copy_files(file, destinationPath, 10240);
                     updateFileArchivalStatus(file, destinationPath);
                 }
@@ -122,7 +117,7 @@ bool ArchivalController::checkArchivalPolicy() {
         auto memoryUtilization = diskSpaceUtilization();
 
         if (!archivalPolicy.contains("THRESHOLD_STORAGE_UTILIZATION")) {
-            logger->critical("Missing threshold configuration", nlohmann::json::object(), "EFMS", false, "05001");
+            logger->critical("Missing threshold configuration", "");
             return false;
         }
 
@@ -131,14 +126,13 @@ bool ArchivalController::checkArchivalPolicy() {
 
         if (memoryUtilization > threshold) {
             logger->info("Storage threshold exceeded", 
-                nlohmann::json{{"Utilization", memoryUtilization}, {"Threshold", threshold}},
-                "EFMS", false, "0");
+                        "Utilization: " + std::to_string(memoryUtilization) + "%, Threshold: " + std::to_string(threshold) + "%");
         }
 
         return memoryUtilization > threshold;
 
     } catch (const std::exception& e) {
-        logger->critical("Failed to check archival policy", nlohmann::json{{"exception", e.what()}}, "EFMS", false, "05001");
+        logger->critical("Failed to check archival policy", e.what());
         return false;
     }
 }
@@ -163,7 +157,7 @@ std::vector<std::string> ArchivalController::getAllFilePaths() {
         }
         return paths;
     } catch (const nlohmann::json::exception& e) {
-        logger->critical("Failed to get file paths", nlohmann::json{{"exception", e.what()}}, "EFMS", false, "05001");
+        logger->critical("Failed to get file paths", e.what());
         throw;
     }
 }
@@ -171,7 +165,7 @@ std::vector<std::string> ArchivalController::getAllFilePaths() {
 double ArchivalController::diskSpaceUtilization() {
     try {
         if (!archivalPolicy.contains("MOUNTED_PATH")) {
-            logger->critical("MOUNTED_PATH not found in policy", nlohmann::json::object(), "EFMS", false, "05001");
+            logger->critical("MOUNTED_PATH not found in policy", "");
             throw std::runtime_error("MOUNTED_PATH key not found in archival policy");
         }
 
@@ -181,14 +175,14 @@ double ArchivalController::diskSpaceUtilization() {
         std::tie(total, used, free) = fileService.get_memory_details(mountedPath);
 
         if (total == 0) {
-            logger->critical("Invalid disk space information", nlohmann::json{{"Total", total}}, "EFMS", false, "05001");
+            logger->critical("Invalid disk space information", "Total space is 0");
             throw std::runtime_error("Invalid disk space information: total space is 0");
         }
 
         return (static_cast<double>(used) / static_cast<double>(total)) * 100.0;
 
     } catch (const std::exception& e) {
-        logger->critical("Failed to get disk space utilization", nlohmann::json{{"exception", e.what()}}, "EFMS", false, "05001");
+        logger->critical("Failed to get disk space utilization", e.what());
         throw;
     }
 }
@@ -201,7 +195,7 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
     const std::string jsonFilePath = "../configuration/archival_config.json";
     std::ifstream file(jsonFilePath);
     if (!file.is_open()) {
-        logger->critical("Failed to open archival config", nlohmann::json{{"path", jsonFilePath}}, "EFMS", false, "05001");
+        logger->critical("Failed to open archival config", jsonFilePath);
         throw std::runtime_error("Could not open archival_config.json");
     }
 
@@ -220,7 +214,7 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
             return data.value("VideoclipsArchival", false);
         }
     } catch (const nlohmann::json::exception& e) {
-        logger->critical("Failed to parse archival config", nlohmann::json{{"exception", e.what()}}, "EFMS", false, "05001");
+        logger->critical("Failed to parse archival config", e.what());
         throw;
     }
 
@@ -254,8 +248,7 @@ bool ArchivalController::isFileArchivedToDDS(const std::string& filePath) {
 }
 
 void ArchivalController::updateFileArchivalStatus(const std::string& filePath, const std::string& ddsFilePath) {
-    auto query = "UPDATE analytics SET dds_video_file_location = '" + ddsFilePath +
-                 "' WHERE video_file_location = '" + filePath + "'";
+    auto query = "UPDATE analytics SET dds_video_file_location = '" + ddsFilePath + "' WHERE video_file_location = '" + filePath + "'";
 }
 
 std::string ArchivalController::getDestinationPath(const std::string& filePath) {
@@ -270,9 +263,7 @@ std::string ArchivalController::getDestinationPath(const std::string& filePath) 
             archivalPolicy.at("DDS_PATH").get<std::string>()
         );
     } else {
-        logger->critical("Failed to create destination path", 
-            nlohmann::json{{"error", "MOUNTED_PATH not found in filePath"}},
-            "EFMS", false, "05001");
+        logger->critical("Failed to create destination path", "MOUNTED_PATH not found in filePath");
     }
     return destinationPath;
 }
