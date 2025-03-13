@@ -7,13 +7,14 @@
 #include <algorithm>
 #include <ddsretentionpolicy.hpp>
 
-RetentionController::RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
-                                       const std::string& logFilePath, 
-                                       const std::string& source) 
+RetentionController::RetentionController(
+    const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
+    const std::string& logFilePath, 
+    const std::string& source) 
     : retentionPolicy(retentionPolicy) {
     try {
         logger = LoggingService::getInstance(source, logFilePath);
-        logger->info("RetentionController initialization started", "");
+        logger->info("RetentionController initialization started", nlohmann::json::object(), "EFMS", true, "05001");
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to initialize logging service: " + std::string(e.what()));
     }
@@ -21,74 +22,74 @@ RetentionController::RetentionController(const std::unordered_map<std::string, s
 
 void RetentionController::applyRetentionPolicy() {
     try {
-        logger->info("Applying Retention Policy...", "");
+        logger->info("Applying Retention Policy...", nlohmann::json::object(), "EFMS", true, "05001");
 
         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
         if (ddsPathIt != retentionPolicy.end()) {
-            logger->info("DDS_PATH found", ddsPathIt->second.at("value"));
+            logger->info("DDS_PATH found", nlohmann::json{{"value", ddsPathIt->second.at("value")}}, "EFMS", true, "05001");
         } else {
-            logger->critical("DDS_PATH is missing in the retention policy!", "");
+            logger->critical("DDS_PATH is missing in the retention policy!", nlohmann::json::object(), "EFMS", true, "05001");
             return;
         }
 
         auto pathIt = ddsPathIt->second.find("value");
         if (pathIt == ddsPathIt->second.end()) {
-            logger->critical("'value' is missing under DDS_PATH!", "");
+            logger->critical("'value' is missing under DDS_PATH!", nlohmann::json::object(), "EFMS", true, "05001");
             return;
         }
 
         if (!fileService.is_mounted_drive_accessible(pathIt->second)) {
-            logger->critical("Drive is not accessible", pathIt->second);
+            logger->critical("Drive is not accessible", nlohmann::json{{"drive", pathIt->second}}, "EFMS", true, "05001");
             return;
         }
 
-        logger->info("Checking retention policy status", "");
+        logger->info("Checking retention policy status", nlohmann::json::object(), "EFMS", true, "05001");
         if (checkRetentionPolicy()) {
             startMaxUtilizationPipeline();
         } else {
             startNormalPipeline();
         }
     } catch (const std::exception& e) {
-        logger->critical("Error applying retention policy", e.what());
+        logger->critical("Error applying retention policy", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
     }
 }
 
 void RetentionController::startMaxUtilizationPipeline() {
-    logger->info("Maximum Utilization Pipeline Started", "");
+    logger->info("Maximum Utilization Pipeline Started", nlohmann::json::object(), "EFMS", true, "05001");
     try {
         auto filepaths = getAllFilePaths();
         for (const auto& filePath : filepaths) {
             auto [files, directories] = fileService.read_directory_recursively(filePath);
             for (const auto& file : files) {
                 if (checkRetentionPolicy() && checkFilePermissions(file)) {
-                    logger->info("Deleting File", file);
+                    logger->info("Deleting File", nlohmann::json{{"file", file}}, "EFMS", true, "05001");
                     fileService.delete_file(file);
                 }
             }
             stopPipeline(directories);
         }
     } catch (const std::exception& e) {
-        logger->critical("Error in Maximum Utilization Pipeline", e.what());
+        logger->critical("Error in Maximum Utilization Pipeline", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
     }
 }
 
 void RetentionController::startNormalPipeline() {
-    logger->info("Normal Pipeline Started", "");
+    logger->info("Normal Pipeline Started", nlohmann::json::object(), "EFMS", true, "05001");
     try {
         auto filepaths = getAllFilePaths();
         for (const auto& filePath : filepaths) {
-            logger->info("Processing directory", filePath);
+            logger->info("Processing directory", nlohmann::json{{"directory", filePath}}, "EFMS", true, "05001");
             auto [files, directories] = fileService.read_directory_recursively(filePath);
             for (const auto& file : files) {
                 if (isFileEligibleForDeletion(file) && checkFilePermissions(file)) {
-                    logger->info("Deleting File", file);
+                    logger->info("Deleting File", nlohmann::json{{"file", file}}, "EFMS", true, "05001");
                     fileService.delete_file(file);
                 }
             }
             stopPipeline(directories);
         }
     } catch (const std::exception& e) {
-        logger->critical("Error in Normal Pipeline", e.what());
+        logger->critical("Error in Normal Pipeline", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
     }
 }
 
@@ -107,10 +108,10 @@ std::vector<std::string> RetentionController::getAllFilePaths() {
             auto pathIt = retentionPolicy.find(policyKey);
             if (pathIt != retentionPolicy.end()) {
                 filepaths.push_back(pathIt->second.at("value"));
-                logger->info("Found policy path", policyKey + ": " + pathIt->second.at("value"));
+                logger->info("Found policy path", nlohmann::json{{policyKey, pathIt->second.at("value")}}, "EFMS", true, "05001");
             }
         } catch (const std::exception& e) {
-            logger->error("Error retrieving file path", policyKey + " - " + e.what());
+            logger->error("Error retrieving file path", nlohmann::json{{"error", policyKey + " - " + e.what()}}, "EFMS", true, "05001");
         }
     }
     
@@ -127,22 +128,21 @@ double RetentionController::diskSpaceUtilization() {
                 auto [totalMemory, usedMemory, freeMemory] = fileService.get_memory_details(path);
                 
                 if (totalMemory == 0) {
-                    logger->critical("Total memory is zero", "Cannot calculate disk space utilization");
+                    logger->critical("Total memory is zero", nlohmann::json{{"message", "Cannot calculate disk space utilization"}}, "EFMS", true, "05001");
                     return 0.0;
                 }
 
                 double utilization = static_cast<double>(usedMemory) / totalMemory * 100.0;
-                logger->info("Disk space utilization calculated", 
-                           "Utilization: " + std::to_string(utilization) + "%");
+                logger->info("Disk space utilization calculated", nlohmann::json{{"utilization", std::to_string(utilization) + "%"}}, "EFMS", true, "05001");
                 return utilization;
             }
-            logger->critical("'PATH' key missing under 'DDS_PATH'", "");
+            logger->critical("'PATH' key missing under 'DDS_PATH'", nlohmann::json::object(), "EFMS", true, "05001");
             return 0.0;
         }
-        logger->critical("'DDS_PATH' key missing in retention policy", "");
+        logger->critical("'DDS_PATH' key missing in retention policy", nlohmann::json::object(), "EFMS", true, "05001");
         return 0.0;
     } catch (const std::exception& e) {
-        logger->critical("Error accessing disk space utilization", e.what());
+        logger->critical("Error accessing disk space utilization", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
         return 0.0;
     }
 }
@@ -154,14 +154,14 @@ bool RetentionController::checkRetentionPolicy() {
         bool exceeded = memoryUtilization > threshold;
         
         if (exceeded) {
-            logger->info("Storage threshold exceeded", 
-                        "Utilization: " + std::to_string(memoryUtilization) + 
-                        "%, Threshold: " + std::to_string(threshold) + "%");
+            logger->info("Storage threshold exceeded", nlohmann::json{
+                {"Utilization", memoryUtilization}, {"Threshold", threshold}
+            }, "EFMS", true, "05001");
         }
         
         return exceeded;
     } catch (const std::exception& e) {
-        logger->critical("Error checking retention policy", e.what());
+        logger->critical("Error checking retention policy", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
         return false;
     }
 }
@@ -182,7 +182,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
             });
 
         if (policyIt == policyMappings.end()) {
-            logger->info("No matching policy found for file", filePath);
+            logger->info("No matching policy found for file", nlohmann::json{{"file", filePath}}, "EFMS",true, "05001");
             return false;
         }
 
@@ -193,7 +193,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
         
         auto pathIt = policyDict.find(retentionPolicyPath);
         if (pathIt == policyDict.end()) {
-            logger->error("Policy path not found", retentionPolicyPath);
+            logger->error("Policy path not found", nlohmann::json{{"policy", retentionPolicyPath}}, "EFMS", true, "05001");
             return false;
         }
 
@@ -212,16 +212,14 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
 
         int fileAge = fileService.get_file_age_in_hours(filePath);
         
-        logger->info("Checking file eligibility", 
-                    "File: " + filePath + 
-                    ", Age: " + std::to_string(fileAge) + 
-                    " hours, Retention Period: " + std::to_string(retentionPeriod) + 
-                    " hours");
+        logger->info("Checking file eligibility", nlohmann::json{
+            {"file", filePath}, {"age_hours", fileAge}, {"retention_hours", retentionPeriod}
+        }, "default_message", false, "0");
 
         return fileAge > retentionPeriod;
 
     } catch (const std::exception& e) {
-        logger->error("Error checking file eligibility", e.what());
+        logger->error("Error checking file eligibility", nlohmann::json{{"exception", e.what()}}, "EFMS", true, "05001");
         return false;
     }
 }
@@ -229,7 +227,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
 bool RetentionController::checkFilePermissions(const std::string& filePath) {
     bool hasPermission = fileService.check_file_permissions(filePath, Permission::DELETE);
     if (!hasPermission) {
-        logger->warning("Insufficient permissions to delete file", filePath);
+        logger->warning("Insufficient permissions to delete file", nlohmann::json{{"file", filePath}}, "EFMS", true, "05001");
     }
     return hasPermission;
 }
@@ -237,7 +235,7 @@ bool RetentionController::checkFilePermissions(const std::string& filePath) {
 void RetentionController::stopPipeline(const std::vector<std::string>& directories) {
     for (const auto& directory : directories) {
         if (fileService.is_directory_empty(directory)) {
-            logger->info("Deleting Empty Directory", directory);
+            logger->info("Deleting Empty Directory", nlohmann::json{{"directory", directory}}, "EFMS", true, "05001");
             fileService.delete_directory(directory);
         }
     }

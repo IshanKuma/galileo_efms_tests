@@ -5,7 +5,10 @@
 // const int vecowretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 75;
 const std::int64_t vecowretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 75;  // Or use std::int64_t
 
-const std::string vecowretentionpolicy::MOUNTED_PATH = "/mnt/storage";
+// const std::string vecowretentionpolicy::MOUNTED_PATH = "/mnt/storage";
+// const std::string vecowretentionpolicy::DDS_PATH = "/mnt/dds/d";
+
+const std::string vecowretentionpolicy::MOUNTED_PATH = "/mnt/sorage";
 const std::string vecowretentionpolicy::DDS_PATH = "/mnt/dds/d";
 const std::string vecowretentionpolicy::SPATIAL_PATH = MOUNTED_PATH + "/Lam/Data/" + "PMX" + "/Spatial";
 const bool vecowretentionpolicy::IS_RETENTION_POLICY_ENABLED = true;
