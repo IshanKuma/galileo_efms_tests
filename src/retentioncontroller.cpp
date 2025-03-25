@@ -1,94 +1,689 @@
+// #include "retentioncontroller.hpp"
+// #include <iostream>
+// #include <stdexcept>
+// #include <vector>
+// #include <string>
+// #include <unordered_map>
+// #include <algorithm>
+// #include <ddsretentionpolicy.hpp>
+
+// RetentionController::RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
+//                                        const std::string& logFilePath, 
+//                                        const std::string& source) 
+//     : retentionPolicy(retentionPolicy) {
+//     try {
+//         logger = LoggingService::getInstance(source, logFilePath);
+//         logger->info("RetentionController initialization started", "");
+//     } catch (const std::exception& e) {
+//         throw std::runtime_error("Failed to initialize logging service: " + std::string(e.what()));
+//     }
+// }
+
+// void RetentionController::applyRetentionPolicy() {
+//     try {
+//         logger->info("Applying Retention Policy...", "");
+
+//         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
+//         if (ddsPathIt != retentionPolicy.end()) {
+//             logger->info("DDS_PATH found", ddsPathIt->second.at("value"));
+//         } else {
+//             logger->critical("DDS_PATH is missing in the retention policy!", "");
+//             return;
+//         }
+
+//         auto pathIt = ddsPathIt->second.find("value");
+//         if (pathIt == ddsPathIt->second.end()) {
+//             logger->critical("'value' is missing under DDS_PATH!", "");
+//             return;
+//         }
+
+//         if (!fileService.is_mounted_drive_accessible(pathIt->second)) {
+//             logger->critical("Drive is not accessible", pathIt->second);
+//             return;
+//         }
+
+//         logger->info("Checking retention policy status", "");
+//         if (checkRetentionPolicy()) {
+//             startMaxUtilizationPipeline();
+//         } else {
+//             startNormalPipeline();
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error applying retention policy", e.what());
+//     }
+// }
+
+// void RetentionController::startMaxUtilizationPipeline() {
+//     logger->info("Maximum Utilization Pipeline Started", "");
+//     try {
+//         auto filepaths = getAllFilePaths();
+//         for (const auto& filePath : filepaths) {
+//             auto [files, directories] = fileService.read_directory_recursively(filePath);
+//             for (const auto& file : files) {
+//                 if (checkRetentionPolicy() && checkFilePermissions(file)) {
+//                     logger->info("Deleting File", file);
+//                     fileService.delete_file(file);
+//                 }
+//             }
+//             stopPipeline(directories);
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error in Maximum Utilization Pipeline", e.what());
+//     }
+// }
+
+// void RetentionController::startNormalPipeline() {
+//     logger->info("Normal Pipeline Started", "");
+//     try {
+//         auto filepaths = getAllFilePaths();
+//         for (const auto& filePath : filepaths) {
+//             logger->info("Processing directory", filePath);
+//             auto [files, directories] = fileService.read_directory_recursively(filePath);
+//             for (const auto& file : files) {
+//                 if (isFileEligibleForDeletion(file) && checkFilePermissions(file)) {
+//                     logger->info("Deleting File", file);
+//                     fileService.delete_file(file);
+//                 }
+//             }
+//             stopPipeline(directories);
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error in Normal Pipeline", e.what());
+//     }
+// }
+
+// std::vector<std::string> RetentionController::getAllFilePaths() {
+//     std::vector<std::string> filepaths;
+//     const std::vector<std::string> policyKeys = {
+//         "VIDEO_RETENTION_POLICY_PATH",
+//         "PARQUET_RETENTION_POLICY_PATH", 
+//         "DIAGNOSTIC_RETENTION_POLICY_PATH",
+//         "LOG_RETENTION_POLICY_PATH", 
+//         "VIDEO_CLIPS_RETENTION_POLICY_PATH"
+//     };
+
+//     for (const auto& policyKey : policyKeys) {
+//         try {
+//             auto pathIt = retentionPolicy.find(policyKey);
+//             if (pathIt != retentionPolicy.end()) {
+//                 filepaths.push_back(pathIt->second.at("value"));
+//                 logger->info("Found policy path", policyKey + ": " + pathIt->second.at("value"));
+//             }
+//         } catch (const std::exception& e) {
+//             logger->error("Error retrieving file path", policyKey + " - " + e.what());
+//         }
+//     }
+    
+//     return filepaths;
+// }
+
+// double RetentionController::diskSpaceUtilization() {
+//     try {
+//         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
+//         if (ddsPathIt != retentionPolicy.end()) {
+//             auto pathIt = ddsPathIt->second.find("value");
+//             if (pathIt != ddsPathIt->second.end()) {
+//                 const std::string& path = pathIt->second;
+//                 auto [totalMemory, usedMemory, freeMemory] = fileService.get_memory_details(path);
+                
+//                 if (totalMemory == 0) {
+//                     logger->critical("Total memory is zero", "Cannot calculate disk space utilization");
+//                     return 0.0;
+//                 }
+
+//                 double utilization = static_cast<double>(usedMemory) / totalMemory * 100.0;
+//                 logger->info("Disk space utilization calculated", 
+//                            "Utilization: " + std::to_string(utilization) + "%");
+//                 return utilization;
+//             }
+//             logger->critical("'PATH' key missing under 'DDS_PATH'", "");
+//             return 0.0;
+//         }
+//         logger->critical("'DDS_PATH' key missing in retention policy", "");
+//         return 0.0;
+//     } catch (const std::exception& e) {
+//         logger->critical("Error accessing disk space utilization", e.what());
+//         return 0.0;
+//     }
+// }
+
+// bool RetentionController::checkRetentionPolicy() {
+//     try {
+//         double memoryUtilization = diskSpaceUtilization();
+//         int threshold = std::stoi(retentionPolicy.at("THRESHOLD_STORAGE_UTILIZATION").at("value"));
+//         bool exceeded = memoryUtilization > threshold;
+        
+//         if (exceeded) {
+//             logger->info("Storage threshold exceeded", 
+//                         "Utilization: " + std::to_string(memoryUtilization) + 
+//                         "%, Threshold: " + std::to_string(threshold) + "%");
+//         }
+        
+//         return exceeded;
+//     } catch (const std::exception& e) {
+//         logger->critical("Error checking retention policy", e.what());
+//         return false;
+//     }
+// }
+
+// bool RetentionController::isFileEligibleForDeletion(const std::string& filePath) {
+//     const std::vector<std::pair<std::string, std::string>> policyMappings = {
+//         {"/Videos/", "VIDEO_RETENTION_POLICY"},
+//         {"/Analysis/", "PARQUET_RETENTION_POLICY"},
+//         {"/Diagnostics/", "DIAGNOSTIC_RETENTION_POLICY"},
+//         {"/Logs/", "LOG_RETENTION_POLICY"},
+//         {"/VideoClips/", "VIDEO_CLIPS_RETENTION_POLICY"}
+//     };
+
+//     try {
+//         auto policyIt = std::find_if(policyMappings.begin(), policyMappings.end(),
+//             [&filePath](const auto& mapping) {
+//                 return filePath.find(mapping.first) != std::string::npos;
+//             });
+
+//         if (policyIt == policyMappings.end()) {
+//             logger->info("No matching policy found for file", filePath);
+//             return false;
+//         }
+
+//         ddsretentionpolicy retentionPolicyObj;
+//         auto policyDict = retentionPolicyObj.to_dict();
+//         std::string policyName = policyIt->second;
+//         std::string retentionPolicyPath = policyName + "_PATH";
+        
+//         auto pathIt = policyDict.find(retentionPolicyPath);
+//         if (pathIt == policyDict.end()) {
+//             logger->error("Policy path not found", retentionPolicyPath);
+//             return false;
+//         }
+
+//         int retentionPeriod = 0;
+//         if (filePath.find("Videos") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::VIDEO_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Analysis") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::PARQUET_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Diagnostics") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::DIAGNOSTIC_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Logs") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::LOG_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("VideoClips") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY.retentionPeriodInHours;
+//         }
+
+//         int fileAge = fileService.get_file_age_in_hours(filePath);
+        
+//         logger->info("Checking file eligibility", 
+//                     "File: " + filePath + 
+//                     ", Age: " + std::to_string(fileAge) + 
+//                     " hours, Retention Period: " + std::to_string(retentionPeriod) + 
+//                     " hours");
+
+//         return fileAge > retentionPeriod;
+
+//     } catch (const std::exception& e) {
+//         logger->error("Error checking file eligibility", e.what());
+//         return false;
+//     }
+// }
+
+// bool RetentionController::checkFilePermissions(const std::string& filePath) {
+//     bool hasPermission = fileService.check_file_permissions(filePath, Permission::DELETE);
+//     if (!hasPermission) {
+//         logger->warning("Insufficient permissions to delete file", filePath);
+//     }
+//     return hasPermission;
+// }
+
+// void RetentionController::stopPipeline(const std::vector<std::string>& directories) {
+//     for (const auto& directory : directories) {
+//         if (fileService.is_directory_empty(directory)) {
+//             logger->info("Deleting Empty Directory", directory);
+//             fileService.delete_directory(directory);
+//         }
+//     }
+// }
+
+
+
+// #include "retentioncontroller.hpp"
+// #include <iostream>
+// #include <stdexcept>
+// #include <vector>
+// #include <string>
+// #include <unordered_map>
+// #include <algorithm>
+// #include <ddsretentionpolicy.hpp>
+
+// RetentionController::RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
+//                                            const std::string& logFilePath, 
+//                                            const std::string& source) 
+//     : retentionPolicy(retentionPolicy) {
+//     try {
+//         logger = LoggingService::getInstance(source, logFilePath);
+//         logger->info("RetentionController initialization started", {{"Initialization started successfully"}}, "RETEN_INIT_START");
+//     } catch (const std::exception& e) {
+//         throw std::runtime_error("Failed to initialize logging service: " + std::string(e.what()));
+//     }
+// }
+
+// void RetentionController::applyRetentionPolicy() {
+//     try {
+//         logger->info("Applying Retention Policy...", {{"Retention policy application initiated"}});
+        
+//         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
+//         if (ddsPathIt != retentionPolicy.end()) {
+//             logger->info("DDS_PATH found", {{ddsPathIt->second.at("value")}} );
+//         } else {
+//             logger->critical("DDS_PATH is missing in the retention policy!", 
+//                              {{"Retention policy does not contain DDS_PATH"}}, 
+//                              "RETENTION_ERR", true, "05001");
+//             return;
+//         }
+
+//         auto pathIt = ddsPathIt->second.find("value");
+//         if (pathIt == ddsPathIt->second.end()) {
+//             logger->critical("'value' is missing under DDS_PATH!", 
+//                              {{"Retention policy for DDS_PATH does not include a value"}}, 
+//                              "RETENTION_ERR", true, "05001");
+//             return;
+//         }
+
+//         if (!fileService.is_mounted_drive_accessible(pathIt->second)) {
+//             logger->critical("Drive is not accessible", 
+//                              {{pathIt->second}}, 
+//                              "RETENTION_ERR", true, "05001");
+//             return;
+//         }
+
+//         logger->info("Checking retention policy status", {{"detail", "Starting retention status check"}});
+//         if (checkRetentionPolicy()) {
+//             startMaxUtilizationPipeline();
+//         } else {
+//             startNormalPipeline();
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error applying retention policy", 
+//                          {{e.what()}}, 
+//                          "RETENTION_ERR", true, "05001");
+//     }
+// }
+
+// void RetentionController::startMaxUtilizationPipeline() {
+//     logger->info("Maximum Utilization Pipeline Started", {{"Max utilization pipeline initiated"}});
+//     try {
+//         auto filepaths = getAllFilePaths();
+//         for (const auto& filePath : filepaths) {
+//             auto [files, directories] = fileService.read_directory_recursively(filePath);
+//             for (const auto& file : files) {
+//                 if (checkRetentionPolicy() && checkFilePermissions(file)) {
+//                     logger->info("Deleting File", {{file}});
+//                     fileService.delete_file(file);
+//                 }
+//             }
+//             stopPipeline(directories);
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error in Maximum Utilization Pipeline", 
+//                          {{e.what()}}, 
+//                          "RETENTION_ERR", true, "05001");
+//     }
+// }
+
+// void RetentionController::startNormalPipeline() {
+//     logger->info("Normal Pipeline Started", {{"Normal pipeline initiated"}});
+//     try {
+//         auto filepaths = getAllFilePaths();
+//         for (const auto& filePath : filepaths) {
+//             logger->info("Processing directory", {{filePath}});
+//             auto [files, directories] = fileService.read_directory_recursively(filePath);
+//             for (const auto& file : files) {
+//                 if (isFileEligibleForDeletion(file) && checkFilePermissions(file)) {
+//                     logger->info("Deleting File", {{file}});
+//                     fileService.delete_file(file);
+//                 }
+//             }
+//             stopPipeline(directories);
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Error in Normal Pipeline", 
+//                          {{e.what()}}, 
+//                          "RETENTION_ERR", true, "05001");
+//     }
+// }
+
+// std::vector<std::string> RetentionController::getAllFilePaths() {
+//     std::vector<std::string> filepaths;
+//     const std::vector<std::string> policyKeys = {
+//         "VIDEO_RETENTION_POLICY_PATH",
+//         "PARQUET_RETENTION_POLICY_PATH", 
+//         "DIAGNOSTIC_RETENTION_POLICY_PATH",
+//         "LOG_RETENTION_POLICY_PATH", 
+//         "VIDEO_CLIPS_RETENTION_POLICY_PATH"
+//     };
+
+//     for (const auto& policyKey : policyKeys) {
+//         try {
+//             auto pathIt = retentionPolicy.find(policyKey);
+//             if (pathIt != retentionPolicy.end()) {
+//                 filepaths.push_back(pathIt->second.at("value"));
+//                 logger->info("Found policy path", {{policyKey + ": " + pathIt->second.at("value")}});
+//             }
+//         } catch (const std::exception& e) {
+//             logger->error("Error retrieving file path", 
+//                           {{"detail", policyKey + " - " + e.what()}}, 
+//                           "RETENTION_ERR", false, "05001");
+//         }
+//     }
+    
+//     return filepaths;
+// }
+
+// double RetentionController::diskSpaceUtilization() {
+//     try {
+//         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
+//         if (ddsPathIt != retentionPolicy.end()) {
+//             auto pathIt = ddsPathIt->second.find("value");
+//             if (pathIt != ddsPathIt->second.end()) {
+//                 const std::string& path = pathIt->second;
+//                 auto [totalMemory, usedMemory, freeMemory] = fileService.get_memory_details(path);
+                
+//                 if (totalMemory == 0) {
+//                     logger->critical("Total memory is zero", 
+//                                      {{"Cannot calculate disk space utilization"}}, 
+//                                      "RETENTION_ERR", true, "05001");
+//                     return 0.0;
+//                 }
+
+//                 double utilization = static_cast<double>(usedMemory) / totalMemory * 100.0;
+//                 logger->info("Disk space utilization calculated", 
+//                              {{"Utilization: " + std::to_string(utilization) + "%"}});
+//                 return utilization;
+//             }
+//             logger->critical("'PATH' key missing under 'DDS_PATH'", 
+//                              {{"Retention policy for DDS_PATH is missing a 'value' key"}}, 
+//                              "RETENTION_ERR", true, "05001");
+//             return 0.0;
+//         }
+//         logger->critical("'DDS_PATH' key missing in retention policy", 
+//                          {{"Retention policy does not include DDS_PATH key"}}, 
+//                          "RETENTION_ERR", true, "05001");
+//         return 0.0;
+//     } catch (const std::exception& e) {
+//         logger->critical("Error accessing disk space utilization", 
+//                          {{ e.what()}}, 
+//                          "RETENTION_ERR", true, "05001");
+//         return 0.0;
+//     }
+// }
+
+// bool RetentionController::checkRetentionPolicy() {
+//     try {
+//         double memoryUtilization = diskSpaceUtilization();
+//         int threshold = std::stoi(retentionPolicy.at("THRESHOLD_STORAGE_UTILIZATION").at("value"));
+//         bool exceeded = memoryUtilization > threshold;
+        
+//         if (exceeded) {
+//             logger->info("Storage threshold exceeded", 
+//                          {{"Utilization: " + std::to_string(memoryUtilization) + "%, Threshold: " + std::to_string(threshold) + "%"}});
+//         }
+        
+//         return exceeded;
+//     } catch (const std::exception& e) {
+//         logger->critical("Error checking retention policy", 
+//                          {{e.what()}}, 
+//                          "RETENTION_ERR", true, "05001");
+//         return false;
+//     }
+// }
+
+// bool RetentionController::isFileEligibleForDeletion(const std::string& filePath) {
+//     const std::vector<std::pair<std::string, std::string>> policyMappings = {
+//         {"/Videos/", "VIDEO_RETENTION_POLICY"},
+//         {"/Analysis/", "PARQUET_RETENTION_POLICY"},
+//         {"/Diagnostics/", "DIAGNOSTIC_RETENTION_POLICY"},
+//         {"/Logs/", "LOG_RETENTION_POLICY"},
+//         {"/VideoClips/", "VIDEO_CLIPS_RETENTION_POLICY"}
+//     };
+
+//     try {
+//         auto policyIt = std::find_if(policyMappings.begin(), policyMappings.end(),
+//             [&filePath](const auto& mapping) {
+//                 return filePath.find(mapping.first) != std::string::npos;
+//             });
+
+//         if (policyIt == policyMappings.end()) {
+//             logger->info("No matching policy found for file", {{filePath}});
+//             return false;
+//         }
+
+//         ddsretentionpolicy retentionPolicyObj;
+//         auto policyDict = retentionPolicyObj.to_dict();
+//         std::string policyName = policyIt->second;
+//         std::string retentionPolicyPath = policyName + "_PATH";
+        
+//         auto pathIt = policyDict.find(retentionPolicyPath);
+//         if (pathIt == policyDict.end()) {
+//             logger->error("Policy path not found", 
+//                           {{retentionPolicyPath}}, 
+//                           "RETENTION_ERR", false, "05001");
+//             return false;
+//         }
+
+//         int retentionPeriod = 0;
+//         if (filePath.find("Videos") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::VIDEO_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Analysis") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::PARQUET_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Diagnostics") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::DIAGNOSTIC_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("Logs") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::LOG_RETENTION_POLICY.retentionPeriodInHours;
+//         } else if (filePath.find("VideoClips") != std::string::npos) {
+//             retentionPeriod = ddsretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY.retentionPeriodInHours;
+//         }
+
+//         int fileAge = fileService.get_file_age_in_hours(filePath);
+        
+//         logger->info("Checking file eligibility", 
+//                      {{"File: " + filePath + ", Age: " + std::to_string(fileAge) + " hours, Retention Period: " + std::to_string(retentionPeriod) + " hours"}});
+//         return fileAge > retentionPeriod;
+
+//     } catch (const std::exception& e) {
+//         logger->error("Error checking file eligibility", 
+//                       {{e.what()}}, 
+//                       "RETENTION_ERR", false, "05001");
+//         return false;
+//     }
+// }
+
+// bool RetentionController::checkFilePermissions(const std::string& filePath) {
+//     bool hasPermission = fileService.check_file_permissions(filePath, Permission::DELETE);
+//     if (!hasPermission) {
+//         logger->warning("Insufficient permissions to delete file", {{filePath}});
+//     }
+//     return hasPermission;
+// }
+
+// void RetentionController::stopPipeline(const std::vector<std::string>& directories) {
+//     for (const auto& directory : directories) {
+//         if (fileService.is_directory_empty(directory)) {
+//             logger->info("Deleting Empty Directory", {{directory}});
+//             fileService.delete_directory(directory);
+//         }
+//     }
+// }
+
+
 #include "retentioncontroller.hpp"
+#include "logutils.hpp"
 #include <iostream>
 #include <stdexcept>
+#include "db_instance.hpp"  
 #include <vector>
 #include <string>
 #include <unordered_map>
 #include <algorithm>
 #include <ddsretentionpolicy.hpp>
+#include <sstream>
+#include <chrono>
+#include <ctime>
+#include <sys/prctl.h>
+#include <unistd.h>
+#include <cstring>
+
+
+
 
 RetentionController::RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
-                                       const std::string& logFilePath, 
-                                       const std::string& source) 
+                                           const std::string& logFilePath, 
+                                           const std::string& source) 
     : retentionPolicy(retentionPolicy) {
     try {
+       
         logger = LoggingService::getInstance(source, logFilePath);
-        logger->info("RetentionController initialization started", "");
+        logger->info("RetentionController initialization started", 
+                     createLogInfo({{"message", "Initialization started successfully"}}), 
+                     "RETEN_INIT_START");
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to initialize logging service: " + std::string(e.what()));
     }
 }
 
+void RetentionController::logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code) {
+    try {
+        std::ostringstream query;
+        // Include the process name in the query. We assume your table has a column called process_name.
+        // Here "EFMS" is hardcoded. You could also pass it as a parameter or retrieve it from a configuration.
+        query << "INSERT INTO incidents (incident_message, incident_time, incident_details, process_name, recovery_status) VALUES ("
+              << "'" << message << "', NOW(), '" << details.dump() << "', 'EFMS', 'PENDING') RETURNING id";
+
+        int lastInsertId = db.executeInsert(query.str());  // Executes the query and fetches the ID
+
+        std::cout << "Inserted incident with ID: " << lastInsertId << std::endl;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Database Insert Failed: " << e.what() << std::endl;
+        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05002");
+    }
+}
+
 void RetentionController::applyRetentionPolicy() {
     try {
-        logger->info("Applying Retention Policy...", "");
-
+        logger->info("Applying Retention Policy...", 
+                     createLogInfo({{"detail", "Retention policy application initiated"}}));
+        
         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
         if (ddsPathIt != retentionPolicy.end()) {
-            logger->info("DDS_PATH found", ddsPathIt->second.at("value"));
+            logger->info("DDS_PATH found", 
+                         createLogInfo({{"value", ddsPathIt->second.at("value")}}));
         } else {
-            logger->critical("DDS_PATH is missing in the retention policy!", "");
+            logger->critical("DDS_PATH is missing in the retention policy!", 
+                 createLogInfo({{"error", "Retention policy does not contain DDS_PATH"}}), 
+                 "RETENTION_ERR", true, "");
+
+            logIncidentToDB("DDS_PATH is missing in the retention policy!", 
+                createLogInfo({{"error", "Retention policy does not contain DDS_PATH"}}), 
+                "RETENTION_ERR");
+
             return;
         }
 
         auto pathIt = ddsPathIt->second.find("value");
         if (pathIt == ddsPathIt->second.end()) {
-            logger->critical("'value' is missing under DDS_PATH!", "");
+            logger->critical("'value' is missing under DDS_PATH!", 
+                 createLogInfo({{"error", "Retention policy for DDS_PATH does not include a value"}}), 
+                 "RETENTION_ERR", true, "");
+
+            logIncidentToDB("'value' is missing under DDS_PATH!", 
+                createLogInfo({{"error", "Retention policy for DDS_PATH does not include a value"}}), 
+                "RETENTION_ERR");
+
             return;
         }
 
         if (!fileService.is_mounted_drive_accessible(pathIt->second)) {
-            logger->critical("Drive is not accessible", pathIt->second);
+            logger->critical("Drive is not accessible", 
+                 createLogInfo({{"path", pathIt->second}}), 
+                 "RETENTION_ERR", true, "");
+
+            logIncidentToDB("Drive is not accessible", 
+                createLogInfo({{"path", pathIt->second}}), 
+                "RETENTION_ERR");
+
             return;
         }
 
-        logger->info("Checking retention policy status", "");
+        logger->info("Checking retention policy status", 
+                     createLogInfo({{"detail", "Starting retention status check"}}));
         if (checkRetentionPolicy()) {
             startMaxUtilizationPipeline();
         } else {
             startNormalPipeline();
         }
     } catch (const std::exception& e) {
-        logger->critical("Error applying retention policy", e.what());
+        logger->critical("Error applying retention policy", 
+                 createLogInfo({{"error", e.what()}}), 
+                 "RETENTION_ERR", true, "");
+
+        logIncidentToDB("Error applying retention policy", 
+                createLogInfo({{"error", e.what()}}), 
+                "RETENTION_ERR");
+
     }
 }
 
 void RetentionController::startMaxUtilizationPipeline() {
-    logger->info("Maximum Utilization Pipeline Started", "");
+    logger->info("Maximum Utilization Pipeline Started", 
+                 createLogInfo({{"detail", "Max utilization pipeline initiated"}}));
     try {
         auto filepaths = getAllFilePaths();
         for (const auto& filePath : filepaths) {
             auto [files, directories] = fileService.read_directory_recursively(filePath);
             for (const auto& file : files) {
                 if (checkRetentionPolicy() && checkFilePermissions(file)) {
-                    logger->info("Deleting File", file);
+                    logger->info("Deleting File", createLogInfo({{"file", file}}));
                     fileService.delete_file(file);
                 }
             }
             stopPipeline(directories);
         }
     } catch (const std::exception& e) {
-        logger->critical("Error in Maximum Utilization Pipeline", e.what());
+        logger->critical("Error in Maximum Utilization Pipeline", 
+                 createLogInfo({{"error", e.what()}}), 
+                 "RETENTION_ERR", true, "");
+
+        logIncidentToDB("Error in Maximum Utilization Pipeline", 
+                createLogInfo({{"error", e.what()}}), 
+                "RETENTION_ERR");
+
     }
 }
 
 void RetentionController::startNormalPipeline() {
-    logger->info("Normal Pipeline Started", "");
+    logger->info("Normal Pipeline Started", 
+                 createLogInfo({{"detail", "Normal pipeline initiated"}}));
     try {
         auto filepaths = getAllFilePaths();
         for (const auto& filePath : filepaths) {
-            logger->info("Processing directory", filePath);
+            logger->info("Processing directory", createLogInfo({{"directory", filePath}}));
             auto [files, directories] = fileService.read_directory_recursively(filePath);
             for (const auto& file : files) {
                 if (isFileEligibleForDeletion(file) && checkFilePermissions(file)) {
-                    logger->info("Deleting File", file);
+                    logger->info("Deleting File", createLogInfo({{"file", file}}));
                     fileService.delete_file(file);
                 }
             }
             stopPipeline(directories);
         }
     } catch (const std::exception& e) {
-        logger->critical("Error in Normal Pipeline", e.what());
+        logger->critical("Error in Normal Pipeline", 
+                 createLogInfo({{"error", e.what()}}), 
+                 "RETENTION_ERR", true, "");
+
+        logIncidentToDB("Error in Normal Pipeline", 
+                createLogInfo({{"error", e.what()}}), 
+                "RETENTION_ERR");
+
     }
 }
 
@@ -107,10 +702,13 @@ std::vector<std::string> RetentionController::getAllFilePaths() {
             auto pathIt = retentionPolicy.find(policyKey);
             if (pathIt != retentionPolicy.end()) {
                 filepaths.push_back(pathIt->second.at("value"));
-                logger->info("Found policy path", policyKey + ": " + pathIt->second.at("value"));
+                logger->info("Found policy path", 
+                             createLogInfo({{"detail", policyKey + ": " + pathIt->second.at("value")}}));
             }
         } catch (const std::exception& e) {
-            logger->error("Error retrieving file path", policyKey + " - " + e.what());
+           
+              
+
         }
     }
     
@@ -127,22 +725,38 @@ double RetentionController::diskSpaceUtilization() {
                 auto [totalMemory, usedMemory, freeMemory] = fileService.get_memory_details(path);
                 
                 if (totalMemory == 0) {
-                    logger->critical("Total memory is zero", "Cannot calculate disk space utilization");
+                    logger->critical("Total memory is zero", 
+                                     createLogInfo({{"error", "Cannot calculate disk space utilization"}}), 
+                                     "RETENTION_ERR", true, "");
                     return 0.0;
                 }
 
                 double utilization = static_cast<double>(usedMemory) / totalMemory * 100.0;
                 logger->info("Disk space utilization calculated", 
-                           "Utilization: " + std::to_string(utilization) + "%");
+                             createLogInfo({{"Utilization", std::to_string(utilization) + "%"}}));
                 return utilization;
             }
-            logger->critical("'PATH' key missing under 'DDS_PATH'", "");
+            logger->critical("'PATH' key missing under 'DDS_PATH'", 
+                 createLogInfo({{"error", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
+                 "RETENTION_ERR", true, "05001");
+
+            logIncidentToDB("'PATH' key missing under 'DDS_PATH'", 
+                createLogInfo({{"error", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
+                "RETENTION_ERR");
+
             return 0.0;
         }
-        logger->critical("'DDS_PATH' key missing in retention policy", "");
+        logger->critical("'DDS_PATH' key missing in retention policy", 
+                 createLogInfo({{"error", "Retention policy does not include DDS_PATH key"}}), 
+                 "RETENTION_ERR", true, "05001");
+
+        logIncidentToDB("'DDS_PATH' key missing in retention policy", 
+                createLogInfo({{"error", "Retention policy does not include DDS_PATH key"}}), 
+                "RETENTION_ERR");
+
         return 0.0;
     } catch (const std::exception& e) {
-        logger->critical("Error accessing disk space utilization", e.what());
+       
         return 0.0;
     }
 }
@@ -155,13 +769,19 @@ bool RetentionController::checkRetentionPolicy() {
         
         if (exceeded) {
             logger->info("Storage threshold exceeded", 
-                        "Utilization: " + std::to_string(memoryUtilization) + 
-                        "%, Threshold: " + std::to_string(threshold) + "%");
+                         createLogInfo({{"Utilization", std::to_string(memoryUtilization) + "%, Threshold: " + std::to_string(threshold) + "%"}}));
         }
         
         return exceeded;
     } catch (const std::exception& e) {
-        logger->critical("Error checking retention policy", e.what());
+        logger->critical("Error checking retention policy", 
+                 createLogInfo({{"error", e.what()}}), 
+                 "RETENTION_ERR", true, "");
+
+        logIncidentToDB("Error checking retention policy", 
+                createLogInfo({{"error", e.what()}}), 
+                "RETENTION_ERR");
+
         return false;
     }
 }
@@ -182,7 +802,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
             });
 
         if (policyIt == policyMappings.end()) {
-            logger->info("No matching policy found for file", filePath);
+            logger->info("No matching policy found for file", createLogInfo({{"file", filePath}}));
             return false;
         }
 
@@ -193,7 +813,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
         
         auto pathIt = policyDict.find(retentionPolicyPath);
         if (pathIt == policyDict.end()) {
-            logger->error("Policy path not found", retentionPolicyPath);
+            
             return false;
         }
 
@@ -213,15 +833,20 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
         int fileAge = fileService.get_file_age_in_hours(filePath);
         
         logger->info("Checking file eligibility", 
-                    "File: " + filePath + 
-                    ", Age: " + std::to_string(fileAge) + 
-                    " hours, Retention Period: " + std::to_string(retentionPeriod) + 
-                    " hours");
-
+                     createLogInfo({{"file", filePath}, 
+                                    {"age", std::to_string(fileAge) + " hours"}, 
+                                    {"retention_period", std::to_string(retentionPeriod) + " hours"}}));
         return fileAge > retentionPeriod;
 
     } catch (const std::exception& e) {
-        logger->error("Error checking file eligibility", e.what());
+        logger->error("Error checking file eligibility", 
+              createLogInfo({{"error", e.what()}}), 
+              "RETENTION_ERR", false, "05001");
+
+        logIncidentToDB("Error checking file eligibility", 
+                createLogInfo({{"error", e.what()}}), 
+                "RETENTION_ERR");
+
         return false;
     }
 }
@@ -229,7 +854,13 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
 bool RetentionController::checkFilePermissions(const std::string& filePath) {
     bool hasPermission = fileService.check_file_permissions(filePath, Permission::DELETE);
     if (!hasPermission) {
-        logger->warning("Insufficient permissions to delete file", filePath);
+        logger->warning("Insufficient permissions to delete file", 
+                createLogInfo({{"file", filePath}}));
+
+        logIncidentToDB("Insufficient permissions to delete file", 
+                createLogInfo({{"file", filePath}}), 
+                "RETENTION_WARN");
+
     }
     return hasPermission;
 }
@@ -237,7 +868,8 @@ bool RetentionController::checkFilePermissions(const std::string& filePath) {
 void RetentionController::stopPipeline(const std::vector<std::string>& directories) {
     for (const auto& directory : directories) {
         if (fileService.is_directory_empty(directory)) {
-            logger->info("Deleting Empty Directory", directory);
+            logger->info("Deleting Empty Directory", 
+                         createLogInfo({{"directory", directory}}));
             fileService.delete_directory(directory);
         }
     }

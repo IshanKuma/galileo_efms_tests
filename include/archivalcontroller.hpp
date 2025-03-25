@@ -15,6 +15,7 @@ public:
     ArchivalController(const nlohmann::json& archivalPolicy, const std::string &source, const std::string &logFilePath);
 
     // Public methods
+    void logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code);
     void applyArchivalPolicy();
     void startMaxUtilizationPipeline();
     void startNormalPipeline();

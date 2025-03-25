@@ -1,48 +1,71 @@
-# Compiler settings
+# # Compiler and flags
+# CXX = g++
+# CXXFLAGS = -std=c++17 -Wall -O2
+
+# # Include and lib flags
+# PKG_CONFIG = `pkg-config --cflags --libs libpqxx libmodbus libzmq`
+# LDFLAGS = -lutilities_lib -pthread
+
+# # Source files and target
+# SRC = src/archivalcontroller.cpp \
+#       src/main.cpp \
+#       src/retentioncontroller.cpp \
+#       src/vecowretentionpolicy.cpp \
+#       src/ddsretentionpolicy.cpp
+
+# TARGET = EFMS_CPP_CODEBASE
+
+# # Default target
+# all: $(TARGET)
+
+# # Linking
+# $(TARGET): $(SRC)
+# 	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(PKG_CONFIG) $(LDFLAGS)
+
+# # Clean
+# clean:
+# 	rm -f $(TARGET)
+
+# # Run target
+# run:
+# 	./$(TARGET)
+
+# .PHONY: all clean run
+
+# Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -I./include
+CXXFLAGS = -std=c++17 -Wall -O2 -Iinclude  # Added -Iinclude for header files
 
-# Build directory
-BUILD_DIR = build
+# Include and lib flags
+PKG_CONFIG = `pkg-config --cflags --libs libpqxx libmodbus libzmq`
+LDFLAGS = -lutilities_lib -pthread
 
-# Source files
-SOURCES = src/archivalcontroller.cpp \
-          src/databaseutilities.cpp \
-          src/fileservice.cpp \
-          src/main.cpp \
-          src/retentioncontroller.cpp
+# Source files and target
+SRC = src/archivalcontroller.cpp \
+      src/main.cpp \
+      src/retentioncontroller.cpp \
+      src/vecowretentionpolicy.cpp \
+      src/ddsretentionpolicy.cpp
 
-# Object files
-OBJECTS = $(SOURCES:src/%.cpp=$(BUILD_DIR)/%.o)
+TARGET = EFMS_CPP_CODEBASE
 
-# Executable name
-EXECUTABLE = $(BUILD_DIR)/EFMS_CPP_CODEBASE
+# Default target
+all: $(TARGET)
 
-# Main target
-all: $(BUILD_DIR) $(EXECUTABLE)
+# Linking
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(PKG_CONFIG) $(LDFLAGS)
 
-# Create build directory
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-# Link the executable
-$(EXECUTABLE): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $@
-
-# Compile source files
-$(BUILD_DIR)/%.o: src/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Clean build files
+# Clean
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
 
-# Clean and rebuild
-# rebuild: clean all
+# Run target
+# run:
+# 	./$(TARGET)
 
-# Test target (if using Catch2)
-# test: all
-# 	$(CXX) $(CXXFLAGS) tests/*.cpp -o $(BUILD_DIR)/test_runner
-# 	./$(BUILD_DIR)/test_runner
+run:
+	cd	configuration && ../$(TARGET)
 
-# .PHONY: all clean rebuild test
+.PHONY: all clean run
+
