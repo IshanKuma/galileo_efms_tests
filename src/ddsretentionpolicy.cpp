@@ -1,5 +1,6 @@
 #include "ddsretentionpolicy.hpp"
-
+#include <ctime>
+#include <filesystem>
 #include <unordered_map>
 
 // const int ddsretentionpolicy::THRESHOLD_STORAGE_UTILIZATION = 85;
@@ -29,10 +30,36 @@ ddsretentionpolicy::RetentionPolicy ddsretentionpolicy::VIDEO_CLIPS_RETENTION_PO
     SPATIAL_PATH + "/VideoClips", true, 24*4, {"mp4", "mkv"}
 };
 
-const std::string ddsretentionpolicy::LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/";
+std::string ddsretentionpolicy::getCurrentDateFolder() {
+    std::time_t now = std::time(nullptr);
+    std::tm* localTime = std::localtime(&now);
+    
+    char buffer[11];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", localTime);
+    
+    return std::string(buffer);
+}
+
+std::string ddsretentionpolicy::getLogDirectory() {
+    std::string logDir = BASE_LOG_DIRECTORY + getCurrentDateFolder() + "/";
+    
+    // Ensure directory exists
+    try {
+        std::filesystem::create_directories(logDir);
+    } catch (const std::filesystem::filesystem_error& e) {
+        throw;
+    }
+    
+    return logDir;
+}
+const std::string ddsretentionpolicy::BASE_LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/";
+// const std::string ddsretentionpolicy::LOG_DIRECTORY = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS/";
+const std::string ddsretentionpolicy::LOG_DIRECTORY = getLogDirectory();
+
 const std::string ddsretentionpolicy::LOG_SOURCE = "EFMS";
 const std::string ddsretentionpolicy::LOG_FILE = "DDS_Retention.log";
-const std::string ddsretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS";
+// const std::string ddsretentionpolicy::LOG_FILE_PATH = "/mnt/storage/Lam/Data/PMX/Spatial/Logs/General/ESK_EFMS";
+const std::string ddsretentionpolicy::LOG_FILE_PATH = LOG_DIRECTORY;
 
 const std::string ddsretentionpolicy::PM = "PMX";
 

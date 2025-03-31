@@ -47,7 +47,7 @@ SRC = src/archivalcontroller.cpp \
       src/vecowretentionpolicy.cpp \
       src/ddsretentionpolicy.cpp
 
-TARGET = EFMS_CPP_CODEBASE
+TARGET = EFMS
 
 # Default target
 all: $(TARGET)
@@ -61,11 +61,12 @@ clean:
 	rm -f $(TARGET)
 
 # Run target
-# run:
-# 	./$(TARGET)
-
 run:
-	cd	configuration && ../$(TARGET)
+	./$(TARGET)
+      
+
+# run:
+# 	cd	configuration && ../$(TARGET)
 
 .PHONY: all clean run
 

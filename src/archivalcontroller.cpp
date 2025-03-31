@@ -339,18 +339,18 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
         logger = LoggingService::getInstance(source, logFilePath);
         // Log initialization started with a timestamp included
         logger->info("ArchivalController initialization started", 
-                     createLogInfo({ {"message", "Initialization started successfully"} }),
+                     createLogInfo({ {"detail", "Initialization started successfully"} }),
                      "ARCH_INIT_START", false);
 
         if (!archivalPolicy.is_object()) {
-            nlohmann::json errInfo = createLogInfo({ {"error_reason", "Archival policy is not a valid JSON object"} });
+            nlohmann::json errInfo = createLogInfo({ {"detail", "Archival policy is not a valid JSON object"} });
             logger->critical("Invalid archival policy: not a JSON object", 
                  errInfo, 
-                 "ARCH_POLICY_INVALID", true, "");
+                 "ARCH_POLICY_INVALID", true, "05001");
 
             logIncidentToDB("Invalid archival policy: not a JSON object", 
                 errInfo, 
-                "ARCH_POLICY_INVALID");
+                "05001");
 
             throw std::runtime_error("Invalid archival policy: not a JSON object");
         }
@@ -370,9 +370,9 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
         this->archivalPolicy = nlohmann::json(archivalPolicy);
         
     } catch (const std::exception& e) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", e.what()} });
-        logger->critical("Initialization failed", errInfo, "ARCH_INIT_FAIL", true, "");
-         logIncidentToDB("Initialization failed", errInfo, "ARCH_INIT_FAIL");
+        nlohmann::json errInfo = createLogInfo({ {"detail", e.what()} });
+        logger->critical("Initialization failed", errInfo, "ARCH_INIT_FAIL", true, "05002");
+         logIncidentToDB("Initialization failed", errInfo, "05002");
 
         throw;
     }
@@ -398,8 +398,7 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
 void ArchivalController::logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code) {
     try {
         std::ostringstream query;
-        // Include the process name in the query. We assume your table has a column called process_name.
-        // Here "EFMS" is hardcoded. You could also pass it as a parameter or retrieve it from a configuration.
+       
         query << "INSERT INTO incidents (incident_message, incident_time, incident_details, process_name, recovery_status) VALUES ("
               << "'" << message << "', NOW(), '" << details.dump() << "', 'EFMS', 'PENDING') RETURNING id";
 
@@ -409,7 +408,7 @@ void ArchivalController::logIncidentToDB(const std::string& message, const nlohm
         
     } catch (const std::exception& e) {
         std::cerr << "Database Insert Failed: " << e.what() << std::endl;
-        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05002");
+        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05003");
     }
 }
 
@@ -458,11 +457,12 @@ void ArchivalController::startNormalPipeline() {
                 //     return;
                 // }
                 if (!fileService.is_mounted_drive_accessible(archivalPolicy.at("DDS_PATH"))) {
-                        nlohmann::json errInfo = createLogInfo({ {"error_reason", "DDS path not accessible: " + archivalPolicy.at("DDS_PATH").get<std::string>()} });
+                        nlohmann::json errInfo = createLogInfo({ {"detail", "DDS path not accessible: " + archivalPolicy.at("DDS_PATH").get<std::string>()} });
                         // Log to file
-                        logger->error("DDS path not accessible", errInfo, "DDS_PATH_ERR", true, "05001");
+                        logger->error("DDS path not accessible", errInfo, "DDS_PATH_ERR", true, "05004");
                         // Also log to the database
-                        logIncidentToDB("DDS path not accessible", errInfo, "DDS_PATH_ERR");
+                        cout<<"DDS path not accessible"<<endl;
+                        logIncidentToDB("DDS path not accessible", errInfo, "05004");
                         return;
                     }
 
@@ -499,7 +499,7 @@ bool ArchivalController::checkArchivalPolicy() {
 
         if (!archivalPolicy.contains("THRESHOLD_STORAGE_UTILIZATION")) {
             nlohmann::json info = createLogInfo({ {"memory_utilization", memoryUtilization}});
-            logger->critical("Missing Threshold Configuration", info, "THRESHOLD_EXCEEDED", false,"");
+            logger->critical("Missing Threshold Configuration", info, "THRESHOLD_EXCEEDED", false,"05005");
             return false;
         }
 
@@ -514,9 +514,9 @@ bool ArchivalController::checkArchivalPolicy() {
         return memoryUtilization > threshold;
 
     } catch (const std::exception& e) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", e.what()} });
-        logger->error("Failed to check archival policy", errInfo, "CHECK_POLICY_FAIL", true, "");
-        logIncidentToDB("Failed to check archival policy", errInfo, "CHECK_POLICY_FAIL");
+        nlohmann::json errInfo = createLogInfo({ {"detail", e.what()} });
+        logger->error("Failed to check archival policy", errInfo, "CHECK_POLICY_FAIL", true, "05006");
+        logIncidentToDB("Failed to check archival policy", errInfo, "05006");
 
         return false;
     }
@@ -542,8 +542,8 @@ std::vector<std::string> ArchivalController::getAllFilePaths() {
         }
         return paths;
     } catch (const nlohmann::json::exception& e) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", e.what()} });
-        logger->critical("Failed to get file paths", errInfo, "GET_PATHS_FAIL", true, "");
+        nlohmann::json errInfo = createLogInfo({ {"detail", e.what()} });
+        logger->critical("Failed to get file paths", errInfo, "GET_PATHS_FAIL", true, "05007");
         throw;
     }
 }
@@ -559,10 +559,10 @@ double ArchivalController::diskSpaceUtilization() {
         std::tie(total, used, free) = fileService.get_memory_details(mountedPath);
 
         if (total == 0) {
-            nlohmann::json errInfo = createLogInfo({ {"error_reason", "Total disk space is 0"} });
+            nlohmann::json errInfo = createLogInfo({ {"detail", "Total disk space is 0"} });
            // Invalid Disk Space Info
-           logger->critical("Invalid disk space information", errInfo, "DISK_INFO_ERR", true, "");
-           logIncidentToDB("Invalid disk space information", errInfo, "DISK_INFO_ERR");
+           logger->critical("Invalid disk space information", errInfo, "DISK_INFO_ERR", true, "05008");
+           logIncidentToDB("Invalid disk space information", errInfo, "05008");
 
             throw std::runtime_error("Invalid disk space information: total space is 0");
         }
@@ -570,9 +570,9 @@ double ArchivalController::diskSpaceUtilization() {
         return (static_cast<double>(used) / static_cast<double>(total)) * 100.0;
 
     } catch (const std::exception& e) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", e.what()} });
-        logger->critical("Failed to get disk space utilization", errInfo, "DISK_UTIL_FAIL", true, "");
-        logIncidentToDB("Failed to get disk space utilization", errInfo, "DISK_UTIL_FAIL");
+        nlohmann::json errInfo = createLogInfo({ {"detail", e.what()} });
+        logger->critical("Failed to get disk space utilization", errInfo, "DISK_UTIL_FAIL", true, "05009");
+        logIncidentToDB("Failed to get disk space utilization", errInfo, "05009");
         throw;
     }
 }
@@ -582,13 +582,57 @@ double ArchivalController::checkFileArchivalPolicy(const std::string& filePath) 
 }
 
 bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) {
-    const std::string jsonFilePath = "../configuration/archival_config.json";
+    // // Get current working directory
+    // char current_path[FILENAME_MAX];
+    // if (getcwd(current_path, sizeof(current_path)) != NULL) {
+    //     std::cout << "Current Working Directory: " << current_path << std::endl;
+    // }
+
+    // // Potential paths to try
+    // const std::vector<std::string> potential_paths = {
+    //     "../configuration/archival_config.json",
+    //     "configuration/archival_config.json",
+    //     "./archival_config.json",
+    //     "archival_config.json"
+    // };
+    // for (const auto& path : potential_paths) {
+    //     std::cout << "Attempting to open config file at: " << path << std::endl;
+        
+    //     std::ifstream file(path);
+    //     if (file.is_open()) {
+    //         std::cout << "Successfully opened configuration file at: " << path << std::endl;
+    //         nlohmann::json data;
+    //         try {
+    //             file >> data;
+    //             if (filePath.find("Videos") != std::string::npos) {
+    //                 return data.value("VideosArchival", false);
+    //             } else if (filePath.find("Analysis") != std::string::npos) {
+    //                 return data.value("AnalysisArchival", false);
+    //             } else if (filePath.find("Diagnostics") != std::string::npos) {
+    //                 return data.value("DiagnosticsArchival", false);
+    //             } else if (filePath.find("Logs") != std::string::npos) {
+    //                 return data.value("LogsArchival", false);
+    //             } else if (filePath.find("VideoClips") != std::string::npos) {
+    //                 return data.value("VideoclipsArchival", false);
+    //             }
+    //         } catch (const nlohmann::json::exception& e) {
+    //             std::cerr << "JSON parsing error: " << e.what() << std::endl;
+    //             return false;
+    //         }
+    //     }
+    // }
+
+//     std::cerr << "Failed to open configuration file from any of the attempted paths" << std::endl;
+//     return false;
+// }
+
+    const std::string jsonFilePath = "configuration/archival_config.json";
     std::ifstream file(jsonFilePath);
 
     if (!file.is_open()) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason",""} });
-        logger->warning("Could not open archival_config.json",errInfo, "", true, "");
-        logIncidentToDB("Could not open archival_config.json", errInfo, "DISK_UTIL_FAIL");
+        nlohmann::json errInfo = createLogInfo({ {"detail","Not able to open the config.json"} });
+        logger->warning("Could not open archival_config.json",errInfo, "", true, "05010");
+        logIncidentToDB("Could not open archival_config.json", errInfo, "05010");
         throw std::runtime_error("Could not open archival_config.json");
     }
 
@@ -607,9 +651,9 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
             return data.value("VideoclipsArchival", false);
         }
     } catch (const nlohmann::json::exception& e) {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", e.what()} });
-        logger->critical("Failed to parse archival config", errInfo, "PARSE_CONFIG_FAIL", true, "");
-        logIncidentToDB("Failed to parse archival config", errInfo, "PARSE_CONFIG_FAIL");
+        nlohmann::json errInfo = createLogInfo({ {"detail", e.what()} });
+        logger->critical("Failed to parse archival config", errInfo, "PARSE_CONFIG_FAIL", true, "05011");
+        logIncidentToDB("Failed to parse archival config", errInfo, "05011");
 
         throw;
     }
@@ -659,9 +703,9 @@ std::string ArchivalController::getDestinationPath(const std::string& filePath) 
             archivalPolicy.at("DDS_PATH").get<std::string>()
         );
     } else {
-        nlohmann::json errInfo = createLogInfo({ {"error_reason", "MOUNTED_PATH not found in filePath"} });
-        logger->critical("Failed to create destination path", errInfo, "DEST_PATH_ERR", true, "");
-        logIncidentToDB("Failed to create destination path", errInfo, "DEST_PATH_ERR");
+        nlohmann::json errInfo = createLogInfo({ {"detail", "MOUNTED_PATH not found in filePath"} });
+        logger->critical("Failed to create destination path", errInfo, "DEST_PATH_ERR", true, "05012");
+        logIncidentToDB("Failed to create destination path", errInfo, "05012");
     }
     return destinationPath;
 }

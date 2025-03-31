@@ -69,14 +69,14 @@ public:
 int main() {
 
 
-    // Set the process name to "EFMS"
-    const char* new_name = "EFMS";
-    if (prctl(PR_SET_NAME, new_name, 0, 0, 0) != 0) {
+    if (prctl(PR_SET_NAME, "EFMS", 0, 0, 0) != 0) {
         perror("prctl failed");
-        return 1;
+        return 1; 
     }
-    std::cout << "Process name set to: " << new_name << std::endl;
-    std::cout << "Process PID: " << getpid() << std::endl;
+    
+    std::cout << "Process name set to EFMS." << std::endl;
+    
+
     try {
         JobScheduler scheduler;
         scheduler.run();

@@ -542,7 +542,7 @@ RetentionController::RetentionController(const std::unordered_map<std::string, s
        
         logger = LoggingService::getInstance(source, logFilePath);
         logger->info("RetentionController initialization started", 
-                     createLogInfo({{"message", "Initialization started successfully"}}), 
+                     createLogInfo({{"detail", "Initialization started successfully"}}), 
                      "RETEN_INIT_START");
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to initialize logging service: " + std::string(e.what()));
@@ -563,7 +563,7 @@ void RetentionController::logIncidentToDB(const std::string& message, const nloh
         
     } catch (const std::exception& e) {
         std::cerr << "Database Insert Failed: " << e.what() << std::endl;
-        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05002");
+        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05013");
     }
 }
 
@@ -575,15 +575,15 @@ void RetentionController::applyRetentionPolicy() {
         auto ddsPathIt = retentionPolicy.find("DDS_PATH");
         if (ddsPathIt != retentionPolicy.end()) {
             logger->info("DDS_PATH found", 
-                         createLogInfo({{"value", ddsPathIt->second.at("value")}}));
+                         createLogInfo({{"detail", ddsPathIt->second.at("value")}}));
         } else {
             logger->critical("DDS_PATH is missing in the retention policy!", 
-                 createLogInfo({{"error", "Retention policy does not contain DDS_PATH"}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", "Retention policy does not contain DDS_PATH"}}), 
+                 "RETENTION_ERR", true, "05014");
 
             logIncidentToDB("DDS_PATH is missing in the retention policy!", 
-                createLogInfo({{"error", "Retention policy does not contain DDS_PATH"}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", "Retention policy does not contain DDS_PATH"}}), 
+                "05014");
 
             return;
         }
@@ -591,24 +591,24 @@ void RetentionController::applyRetentionPolicy() {
         auto pathIt = ddsPathIt->second.find("value");
         if (pathIt == ddsPathIt->second.end()) {
             logger->critical("'value' is missing under DDS_PATH!", 
-                 createLogInfo({{"error", "Retention policy for DDS_PATH does not include a value"}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", "Retention policy for DDS_PATH does not include a value"}}), 
+                 "RETENTION_ERR", true, "05015");
 
             logIncidentToDB("'value' is missing under DDS_PATH!", 
-                createLogInfo({{"error", "Retention policy for DDS_PATH does not include a value"}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", "Retention policy for DDS_PATH does not include a value"}}), 
+                "05015");
 
             return;
         }
 
         if (!fileService.is_mounted_drive_accessible(pathIt->second)) {
-            logger->critical("Drive is not accessible", 
-                 createLogInfo({{"path", pathIt->second}}), 
-                 "RETENTION_ERR", true, "");
+            logger->critical("DDS path not accessible", 
+                 createLogInfo({{"detail", pathIt->second+"Path not accessible"}}), 
+                 "RETENTION_ERR", true, "05016");
 
-            logIncidentToDB("Drive is not accessible", 
-                createLogInfo({{"path", pathIt->second}}), 
-                "RETENTION_ERR");
+            logIncidentToDB("DDS path not accessible", 
+                createLogInfo({{"detail", pathIt->second+"Path not accessible"}}), 
+                "05016");
 
             return;
         }
@@ -622,12 +622,12 @@ void RetentionController::applyRetentionPolicy() {
         }
     } catch (const std::exception& e) {
         logger->critical("Error applying retention policy", 
-                 createLogInfo({{"error", e.what()}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", e.what()}}), 
+                 "RETENTION_ERR", true, "05017");
 
         logIncidentToDB("Error applying retention policy", 
-                createLogInfo({{"error", e.what()}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", e.what()}}), 
+                "05017");
 
     }
 }
@@ -649,12 +649,12 @@ void RetentionController::startMaxUtilizationPipeline() {
         }
     } catch (const std::exception& e) {
         logger->critical("Error in Maximum Utilization Pipeline", 
-                 createLogInfo({{"error", e.what()}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", e.what()}}), 
+                 "RETENTION_ERR", true, "05018");
 
         logIncidentToDB("Error in Maximum Utilization Pipeline", 
-                createLogInfo({{"error", e.what()}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", e.what()}}), 
+                "05018");
 
     }
 }
@@ -677,12 +677,12 @@ void RetentionController::startNormalPipeline() {
         }
     } catch (const std::exception& e) {
         logger->critical("Error in Normal Pipeline", 
-                 createLogInfo({{"error", e.what()}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", e.what()}}), 
+                 "RETENTION_ERR", true, "05019");
 
         logIncidentToDB("Error in Normal Pipeline", 
-                createLogInfo({{"error", e.what()}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", e.what()}}), 
+                "05019");
 
     }
 }
@@ -726,8 +726,8 @@ double RetentionController::diskSpaceUtilization() {
                 
                 if (totalMemory == 0) {
                     logger->critical("Total memory is zero", 
-                                     createLogInfo({{"error", "Cannot calculate disk space utilization"}}), 
-                                     "RETENTION_ERR", true, "");
+                                     createLogInfo({{"detail", "Cannot calculate disk space utilization"}}), 
+                                     "RETENTION_ERR", true, "05020");
                     return 0.0;
                 }
 
@@ -737,22 +737,22 @@ double RetentionController::diskSpaceUtilization() {
                 return utilization;
             }
             logger->critical("'PATH' key missing under 'DDS_PATH'", 
-                 createLogInfo({{"error", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
-                 "RETENTION_ERR", true, "05001");
+                 createLogInfo({{"detail", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
+                 "RETENTION_ERR", true, "05021");
 
             logIncidentToDB("'PATH' key missing under 'DDS_PATH'", 
-                createLogInfo({{"error", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", "Retention policy for DDS_PATH is missing a 'value' key"}}), 
+                "05021");
 
             return 0.0;
         }
         logger->critical("'DDS_PATH' key missing in retention policy", 
-                 createLogInfo({{"error", "Retention policy does not include DDS_PATH key"}}), 
-                 "RETENTION_ERR", true, "05001");
+                 createLogInfo({{"detail", "Retention policy does not include DDS_PATH key"}}), 
+                 "RETENTION_ERR", true, "05022");
 
         logIncidentToDB("'DDS_PATH' key missing in retention policy", 
-                createLogInfo({{"error", "Retention policy does not include DDS_PATH key"}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", "Retention policy does not include DDS_PATH key"}}), 
+                "05022");
 
         return 0.0;
     } catch (const std::exception& e) {
@@ -775,12 +775,12 @@ bool RetentionController::checkRetentionPolicy() {
         return exceeded;
     } catch (const std::exception& e) {
         logger->critical("Error checking retention policy", 
-                 createLogInfo({{"error", e.what()}}), 
-                 "RETENTION_ERR", true, "");
+                 createLogInfo({{"detail", e.what()}}), 
+                 "RETENTION_ERR", true, "05023");
 
         logIncidentToDB("Error checking retention policy", 
-                createLogInfo({{"error", e.what()}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", e.what()}}), 
+                "05023");
 
         return false;
     }
@@ -802,7 +802,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
             });
 
         if (policyIt == policyMappings.end()) {
-            logger->info("No matching policy found for file", createLogInfo({{"file", filePath}}));
+            logger->info("No matching policy found for file", createLogInfo({{"detail", filePath}}));
             return false;
         }
 
@@ -840,12 +840,12 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
 
     } catch (const std::exception& e) {
         logger->error("Error checking file eligibility", 
-              createLogInfo({{"error", e.what()}}), 
-              "RETENTION_ERR", false, "05001");
+              createLogInfo({{"detail", e.what()}}), 
+              "RETENTION_ERR", true, "05024");
 
         logIncidentToDB("Error checking file eligibility", 
-                createLogInfo({{"error", e.what()}}), 
-                "RETENTION_ERR");
+                createLogInfo({{"detail", e.what()}}), 
+                "05024");
 
         return false;
     }
@@ -855,11 +855,11 @@ bool RetentionController::checkFilePermissions(const std::string& filePath) {
     bool hasPermission = fileService.check_file_permissions(filePath, Permission::DELETE);
     if (!hasPermission) {
         logger->warning("Insufficient permissions to delete file", 
-                createLogInfo({{"file", filePath}}));
+                createLogInfo({{"detail", filePath}}),"RETENTION_WARN",true,"05025");
 
         logIncidentToDB("Insufficient permissions to delete file", 
-                createLogInfo({{"file", filePath}}), 
-                "RETENTION_WARN");
+                createLogInfo({{"detail", filePath}}), 
+                "05025");
 
     }
     return hasPermission;
@@ -869,7 +869,7 @@ void RetentionController::stopPipeline(const std::vector<std::string>& directori
     for (const auto& directory : directories) {
         if (fileService.is_directory_empty(directory)) {
             logger->info("Deleting Empty Directory", 
-                         createLogInfo({{"directory", directory}}));
+                         createLogInfo({{"detail", directory}}));
             fileService.delete_directory(directory);
         }
     }
