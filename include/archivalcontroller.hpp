@@ -22,7 +22,6 @@ public:
     void stopPipeline(const std::vector<std::string>& directories);
     FileService fileService;
     
-    // logger = LoggingService::getInstance(source, logFilePath);
 private:
     // Member variables
     nlohmann::json archivalPolicy;
@@ -30,8 +29,7 @@ private:
     std::string source;
     std::string logFilePath;
     // // CustomLogger customLogger;
-    // DatabaseService databaseService;
-
+    
     // Private helper methods
     bool checkArchivalPolicy();
     std::vector<std::string> getAllFilePaths();

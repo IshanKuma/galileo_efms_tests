@@ -83,7 +83,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(EFMS_CPP_CODEBASE)
+project(EFMS)
 
 # Specify C++ standard
 set(CMAKE_CXX_STANDARD 17)

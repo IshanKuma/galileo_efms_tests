@@ -68,19 +68,16 @@ public:
 
 int main() {
 
-
     if (prctl(PR_SET_NAME, "EFMS", 0, 0, 0) != 0) {
         perror("prctl failed");
         return 1; 
     }
     
-    std::cout << "Process name set to EFMS." << std::endl;
-    
-
     try {
         JobScheduler scheduler;
         scheduler.run();
     }
+    
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
