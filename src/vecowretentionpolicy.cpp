@@ -67,7 +67,16 @@ const std::string vecowretentionpolicy::LOG_FILE_PATH = LOG_DIRECTORY;
 const std::string vecowretentionpolicy::PM = "PMX";
 
 vecowretentionpolicy::vecowretentionpolicy() {
-    // Constructor implementation if necessary
+    std::vector<std::string> stations = {"Station1", "Station2", "Station3", "Station4"};
+    
+    for (const auto& station : stations) {
+        VIDEO_STATION_POLICIES[station] = {
+            SPATIAL_PATH + "/" + station + "/Videos", true, 24 * 4, {"mp4", "mkv"}
+        };
+        ANALYSIS_STATION_POLICIES[station] = {
+            SPATIAL_PATH + "/" + station + "/Analysis", true, 24 * 90, {"parquet"}
+        };
+    }
 }
 
 std::unordered_map<std::string, std::string> vecowretentionpolicy::to_dict() const {
@@ -88,6 +97,12 @@ std::unordered_map<std::string, std::string> vecowretentionpolicy::to_dict() con
     result["LOG_SOURCE"] = LOG_SOURCE;
     result["LOG_FILE"] = LOG_FILE;
     result["LOG_FILE_PATH"] = LOG_FILE_PATH;
-
+    // Add station-specific video and analysis policies
+    for (const auto& [station, policy] : VIDEO_STATION_POLICIES) {
+        result["VIDEO_RETENTION_POLICY_" + station] = policy.path;
+    }
+    for (const auto& [station, policy] : ANALYSIS_STATION_POLICIES) {
+        result["ANALYSIS_RETENTION_POLICY_" + station] = policy.path;
+    }
     return result;
 }

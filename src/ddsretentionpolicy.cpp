@@ -64,7 +64,16 @@ const std::string ddsretentionpolicy::LOG_FILE_PATH = LOG_DIRECTORY;
 const std::string ddsretentionpolicy::PM = "PMX";
 
 ddsretentionpolicy::ddsretentionpolicy() {
-    // Constructor implementation if necessary
+    std::vector<std::string> stations = {"Station1", "Station2", "Station3", "Station4"};
+    
+    for (const auto& station : stations) {
+        VIDEO_STATION_POLICIES[station] = {
+            SPATIAL_PATH + "/" + station + "/Videos", true, 24 * 4, {"mp4", "mkv"}
+        };
+        ANALYSIS_STATION_POLICIES[station] = {
+            SPATIAL_PATH + "/" + station + "/Analysis", true, 24 * 4, {"parquet"}
+        };
+    }
 }
 
 std::unordered_map<std::string, std::unordered_map<std::string, std::string>> ddsretentionpolicy::to_dict() const {
@@ -86,7 +95,12 @@ std::unordered_map<std::string, std::unordered_map<std::string, std::string>> dd
     result["LOG_SOURCE"] = {{"value", LOG_SOURCE}};
     result["LOG_FILE"] = {{"value", LOG_FILE}};
     result["LOG_FILE_PATH"] = {{"value", LOG_FILE_PATH}};
-    
+    for (const auto& [station, policy] : VIDEO_STATION_POLICIES) {
+        result["VIDEO_RETENTION_POLICY_" + station] = {{"value", policy.path}};
+    }
+    for (const auto& [station, policy] : ANALYSIS_STATION_POLICIES) {
+        result["ANALYSIS_RETENTION_POLICY_" + station] = {{"value", policy.path}};
+    }
     return result;
 }
 
