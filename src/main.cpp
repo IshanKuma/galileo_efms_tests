@@ -46,7 +46,7 @@ public:
             
             // Check if 5 minutes have passed since last archival run
             auto archival_duration = std::chrono::duration_cast<std::chrono::minutes>(now - last_archival_run);
-            if (archival_duration.count() >= 1) {                       // change 5 to required time 
+            if (archival_duration.count() >= 30) {                       // change 5 to required time 
                 std::cout << "Running Archival Job" << std::endl;
                 archival_controller.applyArchivalPolicy();
                 last_archival_run = now;
@@ -54,7 +54,7 @@ public:
 
             // Check if 5 minutes have passed since last retention run
             auto retention_duration = std::chrono::duration_cast<std::chrono::minutes>(now - last_retention_run);
-            if (retention_duration.count() >= 2) {                    // change 5 to required time 
+            if (retention_duration.count() >= 120) {                    // change 5 to required time 
                 std::cout << "Running Retention Job" << std::endl;
                 retention_controller.applyRetentionPolicy();
                 last_retention_run = now;

@@ -20,6 +20,7 @@
 #include <sys/prctl.h>
 #include <unistd.h>
 #include <cstring>
+#include <filesystem>
 
 FileService fileService;
 
@@ -113,8 +114,17 @@ void ArchivalController::startMaxUtilizationPipeline() {
 
 void ArchivalController::startNormalPipeline() {
     auto filePaths = getAllFilePaths();
+
     for (const auto& filePath : filePaths) {
+        std::cout << "[DEBUG] Checking path: " << filePath << std::endl;
+
+        if (!std::filesystem::exists(filePath)) {
+            std::cerr << "[WARNING] Path does not exist: " << filePath << std::endl;
+            continue;
+        }
+
         auto [files, directories] = fileService.read_directory_recursively(filePath);
+
         for (const auto& file : files) {
             if (isFileEligibleForArchival(file)) {
                 if (!fileService.is_mounted_drive_accessible(archivalPolicy.at("DDS_PATH"))) {
@@ -123,6 +133,7 @@ void ArchivalController::startNormalPipeline() {
                     logIncidentToDB("DDS path not accessible", errInfo, "05004");
                     return;
                 }
+
                 auto destinationPath = getDestinationPath(file);
                 if (!isFileArchivedToDDS(file)) {
                     logger->info("Archiving file", createLogInfo({{"destination", destinationPath}}), "FILE_ARCHIVE", false);
@@ -130,13 +141,42 @@ void ArchivalController::startNormalPipeline() {
                     updateFileArchivalStatus(file, destinationPath);
                 }
             }
+
             if (isFileEligibleForDeletion(file)) {
                 fileService.delete_file(file);
             }
         }
+
         stopPipeline(directories);
     }
 }
+
+// void ArchivalController::startNormalPipeline() {
+//     auto filePaths = getAllFilePaths();
+//     for (const auto& filePath : filePaths) {
+//         auto [files, directories] = fileService.read_directory_recursively(filePath);
+//         for (const auto& file : files) {
+//             if (isFileEligibleForArchival(file)) {
+//                 if (!fileService.is_mounted_drive_accessible(archivalPolicy.at("DDS_PATH"))) {
+//                     nlohmann::json errInfo = createLogInfo({{"detail", "DDS path not accessible"}});
+//                     logger->error("DDS path not accessible", errInfo, "DDS_PATH_ERR", true, "05004");
+//                     logIncidentToDB("DDS path not accessible", errInfo, "05004");
+//                     return;
+//                 }
+//                 auto destinationPath = getDestinationPath(file);
+//                 if (!isFileArchivedToDDS(file)) {
+//                     logger->info("Archiving file", createLogInfo({{"destination", destinationPath}}), "FILE_ARCHIVE", false);
+//                     fileService.copy_files(file, destinationPath, 10240);
+//                     updateFileArchivalStatus(file, destinationPath);
+//                 }
+//             }
+//             if (isFileEligibleForDeletion(file)) {
+//                 fileService.delete_file(file);
+//             }
+//         }
+//         stopPipeline(directories);
+//     }
+// }
 
 void ArchivalController::stopPipeline(const std::vector<std::string>& directories) {
     for (const auto& directory : directories) {
@@ -167,20 +207,47 @@ bool ArchivalController::checkArchivalPolicy() {
 std::vector<std::string> ArchivalController::getAllFilePaths() {
     std::vector<std::string> paths;
     try {
-        if (!archivalPolicy.contains("RETENTION_POLICY_PATHS") || !archivalPolicy["RETENTION_POLICY_PATHS"].is_object()) {
-            return paths;
-        }
-        const auto& retentionPaths = archivalPolicy["RETENTION_POLICY_PATHS"];
-        for (const auto& [key, value] : retentionPaths.items()) {
+        std::cout << "[DEBUG] Starting to extract retention policy paths...\n";
+
+        for (const auto& [key, value] : archivalPolicy.items()) {
+            std::cout << "[DEBUG] Inspecting key: " << key << "\n";
             if (value.is_string()) {
-                paths.push_back(value.get<std::string>());
+                const std::string& path = value.get<std::string>();
+                if (key.find("RETENTION_POLICY") != std::string::npos) {
+                    std::cout << "[DEBUG] Found retention path for key " << key << ": " << path << "\n";
+                    paths.push_back(path);
+                }
+            } else {
+                std::cout << "[DEBUG] Skipping key " << key << " (not a string)\n";
             }
         }
+
+        std::cout << "[DEBUG] Total paths collected: " << paths.size() << "\n";
     } catch (const std::exception& e) {
         logger->critical("Failed to get file paths", createLogInfo({{"detail", e.what()}}), "GET_PATHS_FAIL", true, "05007");
+        std::cerr << "[ERROR] Exception while getting file paths: " << e.what() << "\n";
     }
+
     return paths;
 }
+
+// std::vector<std::string> ArchivalController::getAllFilePaths() {
+//     std::vector<std::string> paths;
+//     try {
+//         if (!archivalPolicy.contains("RETENTION_POLICY_PATHS") || !archivalPolicy["RETENTION_POLICY_PATHS"].is_object()) {
+//             return paths;
+//         }
+//         const auto& retentionPaths = archivalPolicy["RETENTION_POLICY_PATHS"];
+//         for (const auto& [key, value] : retentionPaths.items()) {
+//             if (value.is_string()) {
+//                 paths.push_back(value.get<std::string>());
+//             }
+//         }
+//     } catch (const std::exception& e) {
+//         logger->critical("Failed to get file paths", createLogInfo({{"detail", e.what()}}), "GET_PATHS_FAIL", true, "05007");
+//     }
+//     return paths;
+// }
 
 double ArchivalController::diskSpaceUtilization() {
     try {
@@ -222,22 +289,32 @@ bool ArchivalController::isFileEligibleForDeletion(const std::string& filePath) 
 }
 
 bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) {
-    try {
-        if (!archivalPolicy.contains("ARCHIVAL_FLAGS") || !archivalPolicy["ARCHIVAL_FLAGS"].is_object()) return false;
-        const auto& flags = archivalPolicy["ARCHIVAL_FLAGS"];
+    const std::string jsonFilePath = "../configuration/archival_config.json";
+    std::ifstream file(jsonFilePath);
+    if (!file.is_open()) {
+        logger->critical("Failed to open archival config", jsonFilePath);
+        throw std::runtime_error("Could not open archival_config.json");
+    }
 
-        if (filePath.find("Videos") != std::string::npos && flags.contains("Videos")) {
-            return flags["Videos"].get<bool>();
-        } else if (filePath.find("Analysis") != std::string::npos && flags.contains("Analysis")) {
-            return flags["Analysis"].get<bool>();
-        } else if (filePath.find("Diagnostics") != std::string::npos && flags.contains("Diagnostics")) {
-            return flags["Diagnostics"].get<bool>();
-        } else if (filePath.find("Logs") != std::string::npos && flags.contains("Logs")) {
-            return flags["Logs"].get<bool>();
-        } else if (filePath.find("VideoClips") != std::string::npos && flags.contains("VideoClips")) {
-            return flags["VideoClips"].get<bool>();
+    nlohmann::json data;
+    try {
+        file >> data;
+        if (filePath.find("Videos") != std::string::npos) {
+            return data.value("VideosArchival", false);
+        } else if (filePath.find("Analysis") != std::string::npos) {
+            return data.value("AnalysisArchival", false);
+        } else if (filePath.find("Diagnostics") != std::string::npos) {
+            return data.value("DiagnosticsArchival", false);
+        } else if (filePath.find("Logs") != std::string::npos) {
+            return data.value("LogsArchival", false);
+        } else if (filePath.find("VideoClips") != std::string::npos) {
+            return data.value("VideoclipsArchival", false);
         }
-    } catch (...) {}
+    } catch (const nlohmann::json::exception& e) {
+        logger->critical("Failed to parse archival config", e.what());
+        throw;
+    }
+
     return false;
 }
 
