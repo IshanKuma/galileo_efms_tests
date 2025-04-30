@@ -15,13 +15,13 @@ public:
     ArchivalController(const nlohmann::json& archivalPolicy, const std::string &source, const std::string &logFilePath);
 
     // Public methods
+    void logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code);
     void applyArchivalPolicy();
     void startMaxUtilizationPipeline();
     void startNormalPipeline();
     void stopPipeline(const std::vector<std::string>& directories);
     FileService fileService;
     
-    // logger = LoggingService::getInstance(source, logFilePath);
 private:
     // Member variables
     nlohmann::json archivalPolicy;
@@ -29,8 +29,7 @@ private:
     std::string source;
     std::string logFilePath;
     // // CustomLogger customLogger;
-    // DatabaseService databaseService;
-
+    
     // Private helper methods
     bool checkArchivalPolicy();
     std::vector<std::string> getAllFilePaths();

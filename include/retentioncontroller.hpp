@@ -13,7 +13,7 @@ public:
     RetentionController(const std::unordered_map<std::string, std::unordered_map<std::string, std::string>>& retentionPolicy,
                         const std::string& logFilePath, 
                         const std::string& source);
-
+    void logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code);
     // Public methods
     void applyRetentionPolicy();
     void startMaxUtilizationPipeline();
