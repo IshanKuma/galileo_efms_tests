@@ -182,34 +182,62 @@ void RetentionController::startNormalPipeline() {
 }
 
 // Retrieves all file paths from the retention policy configuration.
-std::vector<std::string> RetentionController::getAllFilePaths() {
-    std::vector<std::string> filepaths;
-     // List of keys to check for file paths.
-    const std::vector<std::string> policyKeys = {
-        "VIDEO_RETENTION_POLICY_PATH",
-        "PARQUET_RETENTION_POLICY_PATH", 
-        "DIAGNOSTIC_RETENTION_POLICY_PATH",
-        "LOG_RETENTION_POLICY_PATH", 
-        "VIDEO_CLIPS_RETENTION_POLICY_PATH"
-    };
+// std::vector<std::string> RetentionController::getAllFilePaths() {
+//     std::vector<std::string> filepaths;
+//      // List of keys to check for file paths.
+//     const std::vector<std::string> policyKeys = {
+//         "VIDEO_RETENTION_POLICY_PATH",
+//         "PARQUET_RETENTION_POLICY_PATH", 
+//         "DIAGNOSTIC_RETENTION_POLICY_PATH",
+//         "LOG_RETENTION_POLICY_PATH", 
+//         "VIDEO_CLIPS_RETENTION_POLICY_PATH"
+//     };
 
-    for (const auto& policyKey : policyKeys) {
-        try {
-            auto pathIt = retentionPolicy.find(policyKey);
-            if (pathIt != retentionPolicy.end()) {
-                filepaths.push_back(pathIt->second.at("value"));
-                logger->info("Found policy path", 
-                             createLogInfo({{"detail", policyKey + ": " + pathIt->second.at("value")}}));
-            }
-        } catch (const std::exception& e) {
+//     for (const auto& policyKey : policyKeys) {
+//         try {
+//             auto pathIt = retentionPolicy.find(policyKey);
+//             if (pathIt != retentionPolicy.end()) {
+//                 filepaths.push_back(pathIt->second.at("value"));
+//                 logger->info("Found policy path", 
+//                              createLogInfo({{"detail", policyKey + ": " + pathIt->second.at("value")}}));
+//             }
+//         } catch (const std::exception& e) {
            
               
 
+//         }
+//     }
+    
+//     return filepaths;
+// }
+
+std::vector<std::string> RetentionController::getAllFilePaths() {
+    std::vector<std::string> filepaths;
+
+    // Loop through all keys in the station-specific retentionPolicy map
+    for (const auto& [key, config] : retentionPolicy) {
+        // Check if key ends with one of the known retention path suffixes
+        if (key.find("VIDEO_RETENTION_POLICY") != std::string::npos ||
+            key.find("PARQUET_RETENTION_POLICY") != std::string::npos ||
+            key.find("DIAGNOSTIC_RETENTION_POLICY") != std::string::npos ||
+            key.find("LOG_RETENTION_POLICY") != std::string::npos ||
+            key.find("VIDEO_CLIPS_RETENTION_POLICY") != std::string::npos) {
+            
+            auto it = config.find("value");
+            if (it != config.end()) {
+                filepaths.push_back(it->second);
+                logger->info("Station-specific policy path found", 
+                             createLogInfo({{"key", key}, {"path", it->second}}));
+            } else {
+                logger->warning("Missing 'value' in policy config", 
+                                createLogInfo({{"key", key}}));
+            }
         }
     }
-    
+
     return filepaths;
 }
+
 
 // Calculates disk space utilization (%) using the DDS_PATH from the retention policy.
 double RetentionController::diskSpaceUtilization() {
@@ -287,61 +315,58 @@ bool RetentionController::checkRetentionPolicy() {
 
 // Determines whether a file is eligible for deletion based on its age and the matching retention policy.
 bool RetentionController::isFileEligibleForDeletion(const std::string& filePath) {
-    const std::vector<std::pair<std::string, std::string>> policyMappings = {
-        {"/Videos/", "VIDEO_RETENTION_POLICY"},
-        {"/Analysis/", "PARQUET_RETENTION_POLICY"},
-        {"/Diagnostics/", "DIAGNOSTIC_RETENTION_POLICY"},
-        {"/Logs/", "LOG_RETENTION_POLICY"},
-        {"/VideoClips/", "VIDEO_CLIPS_RETENTION_POLICY"}
-    };
-
     try {
-        // Find the appropriate retention policy mapping for the given file path.
-        auto policyIt = std::find_if(policyMappings.begin(), policyMappings.end(),
-            [&filePath](const auto& mapping) {
-                return filePath.find(mapping.first) != std::string::npos;
-            });
-
-        if (policyIt == policyMappings.end()) {
-            logger->info("No matching policy found for file", createLogInfo({{"detail", filePath}}));
-            return false;
-        }
-        
-        // Create an instance of the DDS retention policy object and retrieve its dictionary.
-        ddsretentionpolicy retentionPolicyObj;
-        auto policyDict = retentionPolicyObj.to_dict();
-        std::string policyName = policyIt->second;
-        std::string retentionPolicyPath = policyName + "_PATH";
-        
-        // Verify that the required policy path exists in the dictionary.
-        auto pathIt = policyDict.find(retentionPolicyPath);
-        if (pathIt == policyDict.end()) {
-            
+        // Identify policy key suffix based on file path
+        std::string policyKeySuffix;
+        if (filePath.find("/Videos/") != std::string::npos) {
+            policyKeySuffix = "VIDEO_RETENTION_POLICY";
+        } else if (filePath.find("/Analysis/") != std::string::npos) {
+            policyKeySuffix = "PARQUET_RETENTION_POLICY";
+        } else if (filePath.find("/Diagnostics/") != std::string::npos) {
+            policyKeySuffix = "DIAGNOSTIC_RETENTION_POLICY";
+        } else if (filePath.find("/Logs/") != std::string::npos) {
+            policyKeySuffix = "LOG_RETENTION_POLICY";
+        } else if (filePath.find("/VideoClips/") != std::string::npos) {
+            policyKeySuffix = "VIDEO_CLIPS_RETENTION_POLICY";
+        } else {
+            logger->info("No policy key matched for file", createLogInfo({{"detail", filePath}}));
             return false;
         }
 
+        // Try to find the matching station-specific retention key
+        std::string matchedKey;
         int retentionPeriod = 0;
-        // Determine the retention period based on file type.
-        if (filePath.find("Videos") != std::string::npos) {
-            retentionPeriod = ddsretentionpolicy::VIDEO_RETENTION_POLICY.retentionPeriodInHours;
-        } else if (filePath.find("Analysis") != std::string::npos) {
-            retentionPeriod = ddsretentionpolicy::PARQUET_RETENTION_POLICY.retentionPeriodInHours;
-        } else if (filePath.find("Diagnostics") != std::string::npos) {
-            retentionPeriod = ddsretentionpolicy::DIAGNOSTIC_RETENTION_POLICY.retentionPeriodInHours;
-        } else if (filePath.find("Logs") != std::string::npos) {
-            retentionPeriod = ddsretentionpolicy::LOG_RETENTION_POLICY.retentionPeriodInHours;
-        } else if (filePath.find("VideoClips") != std::string::npos) {
-            retentionPeriod = ddsretentionpolicy::VIDEO_CLIPS_RETENTION_POLICY.retentionPeriodInHours;
+
+        for (const auto& [key, config] : retentionPolicy) {
+            if (key.find(policyKeySuffix) != std::string::npos) {
+                const std::string& policyPath = config.at("value");
+                if (filePath.find(policyPath) != std::string::npos) {
+                    matchedKey = key;
+                    if (config.find("retentionPeriod") != config.end()) {
+                        retentionPeriod = std::stoi(config.at("retentionPeriod"));
+                    } else {
+                        logger->warning("Missing 'retentionPeriod' for key", createLogInfo({{"key", key}}));
+                        return false;
+                    }
+                    break;
+                }
+            }
         }
-           
-        // Get the file's age in hours.
+
+        if (matchedKey.empty()) {
+            logger->info("No station-specific policy matched file", createLogInfo({{"file", filePath}}));
+            return false;
+        }
+
         int fileAge = fileService.get_file_age_in_hours(filePath);
-        
         logger->info("Checking file eligibility", 
-                     createLogInfo({{"file", filePath}, 
-                                    {"age", std::to_string(fileAge) + " hours"}, 
-                                    {"retention_period", std::to_string(retentionPeriod) + " hours"}}));
-        // File is eligible for deletion if its age exceeds the retention period.
+                     createLogInfo({
+                         {"file", filePath}, 
+                         {"age", std::to_string(fileAge) + " hours"}, 
+                         {"retention_period", std::to_string(retentionPeriod) + " hours"},
+                         {"matched_policy", matchedKey}
+                     }));
+
         return fileAge > retentionPeriod;
 
     } catch (const std::exception& e) {
@@ -356,6 +381,7 @@ bool RetentionController::isFileEligibleForDeletion(const std::string& filePath)
         return false;
     }
 }
+
 
 // Checks whether the file has the appropriate permissions for deletion.
 bool RetentionController::checkFilePermissions(const std::string& filePath) {
