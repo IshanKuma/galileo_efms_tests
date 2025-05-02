@@ -69,7 +69,7 @@ public:
 int main() {
 
     if (prctl(PR_SET_NAME, "EFMS", 0, 0, 0) != 0) {
-        perror("prctl failed");
+        perror("process control failed");
         return 1; 
     }
     
