@@ -181,36 +181,6 @@ void RetentionController::startNormalPipeline() {
     }
 }
 
-// Retrieves all file paths from the retention policy configuration.
-// std::vector<std::string> RetentionController::getAllFilePaths() {
-//     std::vector<std::string> filepaths;
-//      // List of keys to check for file paths.
-//     const std::vector<std::string> policyKeys = {
-//         "VIDEO_RETENTION_POLICY_PATH",
-//         "PARQUET_RETENTION_POLICY_PATH", 
-//         "DIAGNOSTIC_RETENTION_POLICY_PATH",
-//         "LOG_RETENTION_POLICY_PATH", 
-//         "VIDEO_CLIPS_RETENTION_POLICY_PATH"
-//     };
-
-//     for (const auto& policyKey : policyKeys) {
-//         try {
-//             auto pathIt = retentionPolicy.find(policyKey);
-//             if (pathIt != retentionPolicy.end()) {
-//                 filepaths.push_back(pathIt->second.at("value"));
-//                 logger->info("Found policy path", 
-//                              createLogInfo({{"detail", policyKey + ": " + pathIt->second.at("value")}}));
-//             }
-//         } catch (const std::exception& e) {
-           
-              
-
-//         }
-//     }
-    
-//     return filepaths;
-// }
-
 std::vector<std::string> RetentionController::getAllFilePaths() {
     std::vector<std::string> filepaths;
 
