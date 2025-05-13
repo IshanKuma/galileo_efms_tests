@@ -17,13 +17,13 @@ public:
     static std::string getCurrentDateFolder();
     static std::string getLogDirectory();
 
-    // Constants
-    static const std::int64_t THRESHOLD_STORAGE_UTILIZATION;
-    static const std::string MOUNTED_PATH;
-    static const std::string DDS_PATH;
-    static const std::string SPATIAL_PATH;
-    static const bool IS_RETENTION_POLICY_ENABLED;
-    static const int RETENTION_PERIOD_IN_HOURS;
+    // Static variables (no longer const - will be loaded from config)
+    static std::int64_t THRESHOLD_STORAGE_UTILIZATION;
+    static std::string MOUNTED_PATH;
+    static std::string DDS_PATH;
+    static std::string SPATIAL_PATH;
+    static bool IS_RETENTION_POLICY_ENABLED;
+    static int RETENTION_PERIOD_IN_HOURS;
 
     struct RetentionPolicy {
         std::string path;
@@ -33,26 +33,25 @@ public:
     };
 
     // Retention policies
-    // static RetentionPolicy VIDEO_RETENTION_POLICY;
-    // static RetentionPolicy PARQUET_RETENTION_POLICY;
     static RetentionPolicy DIAGNOSTIC_RETENTION_POLICY;
     static RetentionPolicy LOG_RETENTION_POLICY;
     static RetentionPolicy VIDEO_CLIPS_RETENTION_POLICY;
 
     // Log metadata
-    static const std::string BASE_LOG_DIRECTORY;
-    static const std::string LOG_DIRECTORY;
-    static const std::string LOG_SOURCE;
-    static const std::string LOG_FILE;
-    static const std::string LOG_FILE_PATH;
+    static std::string BASE_LOG_DIRECTORY;
+    static std::string LOG_DIRECTORY;
+    static std::string LOG_SOURCE;
+    static std::string LOG_FILE;
+    static std::string LOG_FILE_PATH;
 
     // Station-specific retention policies
     static std::unordered_map<std::string, RetentionPolicy> VIDEO_STATION_POLICIES;
     static std::unordered_map<std::string, RetentionPolicy> ANALYSIS_STATION_POLICIES;
 
-private:
-    static const std::string PM;
-    // static void initialize_station_policies();  // Ensures static map setup
+    static std::string PM;
+
+    // Configuration loading
+    static void loadConfig();
 };
 
 #endif // VECOWRETENTIONPOLICY_HPP

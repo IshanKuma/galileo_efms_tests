@@ -35,17 +35,36 @@ RetentionController::RetentionController(const std::unordered_map<std::string, s
 // Logs an incident to the database by inserting an incident record.
 void RetentionController::logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code) {
     try {
-        std::ostringstream query;
-        query << "INSERT INTO incidents (incident_message, incident_time, incident_details, process_name, recovery_status) VALUES ("
-              << "'" << message << "', NOW(), '" << details.dump() << "', 'EFMS', 'PENDING') RETURNING id";
-
-        int lastInsertId = db.executeInsert(query.str());  // Executes the query and fetches the ID
-
-        std::cout << "Inserted incident with ID: " << lastInsertId << std::endl;
+        // Check if the most recent incident with this message is still active (no recovery attempts or failed recovery)
+        std::ostringstream checkQuery;
+        checkQuery << "SELECT i.id FROM incident i "
+                  << "LEFT JOIN recovery r ON i.id = r.incident_id "
+                  << "WHERE i.incident_message = '" << message << "' "
+                  << "AND i.process_name = 'EFMS' "
+                  << "AND (r.id IS NULL OR r.recovery_status = 'FAILED') "
+                  << "ORDER BY i.incident_time DESC LIMIT 1";
         
+        auto result = db.executeSelect(checkQuery.str());
+        
+        // If no active incident exists, insert a new one
+        if (result.empty()) {
+            // Ensure error_code is included in the details JSON
+            nlohmann::json detailsWithCode = details;
+            detailsWithCode["error_code"] = error_code;
+            
+            std::ostringstream insertQuery;
+            insertQuery << "INSERT INTO incident (process_name, incident_message, incident_time, incident_details) "
+                       << "VALUES ('EFMS', '" << message << "', NOW(), '" << detailsWithCode.dump() << "') "
+                       << "RETURNING id";
+            
+            int lastInsertId = db.executeInsert(insertQuery.str());
+            std::cout << "Inserted incident with ID: " << lastInsertId << " for error code: " << error_code << std::endl;
+        } else {
+            std::cout << "Skipped duplicate incident: " << message << " (already active or no successful recovery)" << std::endl;
+        }
     } catch (const std::exception& e) {
-        std::cerr << "Database Insert Failed: " << e.what() << std::endl;
-        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05013");
+        std::cerr << "Database Operation Failed: " << e.what() << std::endl;
+        logger->error("Database Operation Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05013");
     }
 }
 

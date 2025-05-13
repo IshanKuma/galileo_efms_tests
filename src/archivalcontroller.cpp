@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <filesystem>
+#include <map>
 
 FileService fileService;
 
@@ -32,11 +33,50 @@ DatabaseUtilities& db = DatabaseUtilities::getInstance({
     5432                  
 });
 
+// Global configuration variables
+namespace ArchivalConfig {
+    int bandwidth_limit_kb = 10240;  // Default value
+    std::map<std::string, bool> eligibility;
+    bool config_loaded = false;
+    
+    void loadConfig() {
+        if (config_loaded) return;
+        
+        std::ifstream configFile("config.json");
+        if (!configFile.is_open()) {
+            return;
+        }
+        
+        try {
+            nlohmann::json config;
+            configFile >> config;
+            
+            auto archival = config["archival"];
+            bandwidth_limit_kb = archival["bandwidth_limit_kb"].get<int>();
+            
+            auto elig = archival["eligibility"];
+            for (auto& [key, value] : elig.items()) {
+                eligibility[key] = value.get<bool>();
+            }
+            
+            config_loaded = true;
+            
+        } catch (const nlohmann::json::exception& e) {
+            // Silent catch
+        }
+        
+        configFile.close();
+    }
+}
+
 ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
                                        const std::string& source,
                                        const std::string& logFilePath)
     : archivalPolicy(archivalPolicy), source(source), logFilePath(logFilePath) {
     try {
+        // Load configuration at initialization
+        ArchivalConfig::loadConfig();
+        
         logger = LoggingService::getInstance(source, logFilePath);
         logger->info("ArchivalController initialization started",
                      createLogInfo({{"detail", "Initialization started successfully"}}),
@@ -72,14 +112,36 @@ ArchivalController::ArchivalController(const nlohmann::json& archivalPolicy,
 
 void ArchivalController::logIncidentToDB(const std::string& message, const nlohmann::json& details, const std::string& error_code) {
     try {
-        std::ostringstream query;
-        query << "INSERT INTO incidents (incident_message, incident_time, incident_details, process_name, recovery_status) VALUES ('"
-              << message << "', NOW(), '" << details.dump() << "', 'EFMS', 'PENDING') RETURNING id";
-        int lastInsertId = db.executeInsert(query.str());
-        std::cout << "Inserted incident with ID: " << lastInsertId << std::endl;
+        // Check if the most recent incident with this message is still active (no recovery attempts or failed recovery)
+        std::ostringstream checkQuery;
+        checkQuery << "SELECT i.id FROM incident i "
+                  << "LEFT JOIN recovery r ON i.id = r.incident_id "
+                  << "WHERE i.incident_message = '" << message << "' "
+                  << "AND i.process_name = 'EFMS' "
+                  << "AND (r.id IS NULL OR r.recovery_status = 'FAILED') "
+                  << "ORDER BY i.incident_time DESC LIMIT 1";
+        
+        auto result = db.executeSelect(checkQuery.str());
+        
+        // If no active incident exists, insert a new one
+        if (result.empty()) {
+            // Ensure error_code is included in the details JSON
+            nlohmann::json detailsWithCode = details;
+            detailsWithCode["error_code"] = error_code;
+            
+            std::ostringstream insertQuery;
+            insertQuery << "INSERT INTO incident (process_name, incident_message, incident_time, incident_details) "
+                       << "VALUES ('EFMS', '" << message << "', NOW(), '" << detailsWithCode.dump() << "') "
+                       << "RETURNING id";
+            
+            int lastInsertId = db.executeInsert(insertQuery.str());
+            std::cout << "Inserted incident with ID: " << lastInsertId << " for error code: " << error_code << std::endl;
+        } else {
+            std::cout << "Skipped duplicate incident: " << message << " (already active or no successful recovery)" << std::endl;
+        }
     } catch (const std::exception& e) {
-        std::cerr << "Database Insert Failed: " << e.what() << std::endl;
-        logger->error("Database Insert Failed", {{"error", e.what()}}, "DB_INSERT_FAIL", true, "05003");
+        std::cerr << "Database Operation Failed: " << e.what() << std::endl;
+        logger->error("Database Operation Failed", {{"error", e.what()}}, "DB_OPERATION_FAIL", true, "05003");
     }
 }
 
@@ -137,7 +199,7 @@ void ArchivalController::startNormalPipeline() {
                 auto destinationPath = getDestinationPath(file);
                 if (!isFileArchivedToDDS(file)) {
                     logger->info("Archiving file", createLogInfo({{"destination", destinationPath}}), "FILE_ARCHIVE", false);
-                    fileService.copy_files(file, destinationPath, 10240);
+                    fileService.copy_files(file, destinationPath, ArchivalConfig::bandwidth_limit_kb);
                     updateFileArchivalStatus(file, destinationPath);
                 }
             }
@@ -184,14 +246,21 @@ std::vector<std::string> ArchivalController::getAllFilePaths() {
 
         for (const auto& [key, value] : archivalPolicy.items()) {
             std::cout << "[DEBUG] Inspecting key: " << key << "\n";
-            if (value.is_string()) {
+            
+            // Only process string values with RETENTION_POLICY in key and that look like paths
+            if (value.is_string() && key.find("RETENTION_POLICY") != std::string::npos) {
                 const std::string& path = value.get<std::string>();
-                if (key.find("RETENTION_POLICY") != std::string::npos) {
+                
+                // Check if it looks like a path
+                if (!path.empty() && (path[0] == '/' || path.find('/') != std::string::npos) && 
+                    !(path.length() < 10 && path[0] >= 'a' && path[0] <= 'z')) {
                     std::cout << "[DEBUG] Found retention path for key " << key << ": " << path << "\n";
                     paths.push_back(path);
+                } else {
+                    std::cout << "[DEBUG] Skipping key " << key << " (value doesn't look like a path)\n";
                 }
             } else {
-                std::cout << "[DEBUG] Skipping key " << key << " (not a string)\n";
+                std::cout << "[DEBUG] Skipping key " << key << " (not a string or not a retention policy)\n";
             }
         }
 
@@ -244,30 +313,22 @@ bool ArchivalController::isFileEligibleForDeletion(const std::string& filePath) 
 }
 
 bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) {
-    const std::string jsonFilePath = "../configuration/archival_config.json";
-    std::ifstream file(jsonFilePath);
-    if (!file.is_open()) {
-        logger->critical("Failed to open archival config", jsonFilePath);
-        throw std::runtime_error("Could not open archival_config.json");
+    // Check if config was loaded
+    if (!ArchivalConfig::config_loaded || ArchivalConfig::eligibility.empty()) {
+        return true;  // Default to eligible if config fails
     }
-
-    nlohmann::json data;
-    try {
-        file >> data;
-        if (filePath.find("Videos") != std::string::npos) {
-            return data.value("VideosArchival", false);
-        } else if (filePath.find("Analysis") != std::string::npos) {
-            return data.value("AnalysisArchival", false);
-        } else if (filePath.find("Diagnostics") != std::string::npos) {
-            return data.value("DiagnosticsArchival", false);
-        } else if (filePath.find("Logs") != std::string::npos) {
-            return data.value("LogsArchival", false);
-        } else if (filePath.find("VideoClips") != std::string::npos) {
-            return data.value("VideoclipsArchival", false);
-        }
-    } catch (const nlohmann::json::exception& e) {
-        logger->critical("Failed to parse archival config", e.what());
-        throw;
+    
+    // Use configured eligibility from config.json
+    if (filePath.find("Videos") != std::string::npos) {
+        return ArchivalConfig::eligibility["Videos"];
+    } else if (filePath.find("Analysis") != std::string::npos) {
+        return ArchivalConfig::eligibility["Analysis"];
+    } else if (filePath.find("Diagnostics") != std::string::npos) {
+        return ArchivalConfig::eligibility["Diagnostics"];
+    } else if (filePath.find("Logs") != std::string::npos) {
+        return ArchivalConfig::eligibility["Logs"];
+    } else if (filePath.find("VideoClips") != std::string::npos) {
+        return ArchivalConfig::eligibility["VideoClips"];
     }
 
     return false;
@@ -276,9 +337,11 @@ bool ArchivalController::isFileEligibleForArchival(const std::string& filePath) 
 bool ArchivalController::isFileArchivedToDDS(const std::string& filePath) {
     std::string query;
     if (filePath.find("Videos") != std::string::npos) {
-        query = "SELECT dds_video_file_location FROM analytics WHERE video_file_location = '" + filePath + "'";
+        // Use COALESCE to handle NULL values
+        query = "SELECT COALESCE(dds_video_file_location, '') as dds_location FROM analytics WHERE video_file_location = '" + filePath + "'";
     } else if (filePath.find("Analysis") != std::string::npos) {
-        query = "SELECT dds_parquet_file_location FROM analytics WHERE parquet_file_location = '" + filePath + "'";
+        // Use COALESCE to handle NULL values  
+        query = "SELECT COALESCE(dds_parquet_file_location, '') as dds_location FROM analytics WHERE parquet_file_location = '" + filePath + "'";
     } else {
         std::string mountedPath = archivalPolicy.at("MOUNTED_PATH").get<std::string>();
         std::string ddsPath = archivalPolicy.at("DDS_PATH").get<std::string>();
@@ -292,15 +355,34 @@ bool ArchivalController::isFileArchivedToDDS(const std::string& filePath) {
         return fileService.file_exists(ddsFilePath);
     }
 
-    auto result = db.executeSelect(query);
-    for (const auto& row : result) {
-        if (row.empty() || row[0].empty()) {
+    try {
+        auto result = db.executeSelect(query);
+        
+        // If no rows returned, file is not archived
+        if (result.empty()) {
             return false;
         }
+        
+        // Check if the DDS location is not empty
+        for (const auto& row : result) {
+            if (!row.empty()) {
+                std::string ddsLocation = row[0];
+                if (!ddsLocation.empty()) {
+                    return true;  // File is archived if we have a non-empty DDS location
+                }
+            }
+        }
+        
+        return false;  // File is not archived if DDS location is empty or NULL
+        
+    } catch (const std::exception& e) {
+        // Log the error but don't throw - just return false
+        logger->error("Error checking file archival status", 
+                     createLogInfo({{"error", e.what()}, {"file", filePath}}), 
+                     "ARCHIVE_CHECK_FAIL", false, "05010");
+        return false;
     }
-    return !result.empty();
 }
-
 
 void ArchivalController::updateFileArchivalStatus(const std::string& filePath, const std::string& ddsFilePath) {
     std::string query;
