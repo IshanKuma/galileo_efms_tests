@@ -30,12 +30,12 @@ public:
         std::vector<std::string> fileExtensions;
     };
 
-    // Constants
-    static const std::int64_t THRESHOLD_STORAGE_UTILIZATION;
-    static const std::string DDS_PATH;
-    static const std::string SPATIAL_PATH;
-    static const bool IS_RETENTION_POLICY_ENABLED;
-    static const int RETENTION_PERIOD_IN_HOURS;
+    // Static variables (no longer const - will be loaded from config)
+    static std::int64_t THRESHOLD_STORAGE_UTILIZATION;
+    static std::string DDS_PATH;
+    static std::string SPATIAL_PATH;
+    static bool IS_RETENTION_POLICY_ENABLED;
+    static int RETENTION_PERIOD_IN_HOURS;
 
     // Retention Policies
     static RetentionPolicy DIAGNOSTIC_RETENTION_POLICY;
@@ -43,18 +43,20 @@ public:
     static RetentionPolicy VIDEO_CLIPS_RETENTION_POLICY;
 
     // Logging
-    static const std::string BASE_LOG_DIRECTORY;
-    static const std::string LOG_DIRECTORY;
-    static const std::string LOG_SOURCE;
-    static const std::string LOG_FILE;
-    static const std::string LOG_FILE_PATH;
+    static std::string BASE_LOG_DIRECTORY;
+    static std::string LOG_DIRECTORY;
+    static std::string LOG_SOURCE;
+    static std::string LOG_FILE;
+    static std::string LOG_FILE_PATH;
 
     // Station Policies
     static std::unordered_map<std::string, RetentionPolicy> VIDEO_STATION_POLICIES;
     static std::unordered_map<std::string, RetentionPolicy> ANALYSIS_STATION_POLICIES;
 
-private:
-    static const std::string PM;
+    static std::string PM;
+
+    // Configuration loading
+    static void loadConfig();
 };
 
 #endif // DDSRETENTIONPOLICY_HPP
