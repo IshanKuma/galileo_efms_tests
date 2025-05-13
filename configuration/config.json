@@ -1,0 +1,117 @@
+{
+    "scheduler": {
+      "archival_interval_minutes": 30,
+      "retention_interval_minutes": 120,
+      "poll_interval_seconds": 1
+    },
+    
+    "archival": {
+      "bandwidth_limit_kb": 10240,
+      "eligibility": {
+        "Videos": true,
+        "Analysis": true,
+        "Logs": true,
+        "VideoClips": true,
+        "Diagnostics": true
+      }
+    },
+    
+    "vecow_retention_policy": {
+      "threshold_storage_utilization": 75,
+      "mounted_path": "/mnt/storage",
+      "dds_path": "/mnt/dds/d",
+      "spatial_path": "/mnt/storage/Lam/Data/PMX/Spatial",
+      "is_retention_policy_enabled": true,
+      "retention_period_in_hours": 40,
+      "base_log_directory": "/mnt/storage/Lam/Data/PMX/Spatial/Logs/",
+      "log_source": "EdgeController_Retention_Archival",
+      "log_file": "EdgeController_Retention_Archival.log",
+      "pm": "PMX",
+      
+      "retention_policies": {
+        "diagnostic": {
+          "path": "/mnt/storage/Lam/Data/PMX/Spatial/Diagnostics",
+          "enabled": true,
+          "retention_hours": 720,
+          "file_types": ["csv", "json", "txt"]
+        },
+        "log": {
+          "path": "/mnt/storage/Lam/Data/PMX/Spatial/Logs",
+          "enabled": true,
+          "retention_hours": 2160,
+          "file_types": ["log"]
+        },
+        "video_clips": {
+          "path": "/mnt/storage/Lam/Data/PMX/Spatial/VideoClips",
+          "enabled": true,
+          "retention_hours": 2160,
+          "file_types": ["mp4", "mkv"]
+        }
+      },
+      
+      "station_policies": {
+        "stations": ["Station1", "Station2", "Station3", "Station4"],
+        "video": {
+          "path_suffix": "/Videos",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["mp4", "mkv"]
+        },
+        "analysis": {
+          "path_suffix": "/Analysis",
+          "enabled": true,
+          "retention_hours": 2160,
+          "file_types": ["parquet"]
+        }
+      }
+    },
+    
+    "dds_retention_policy": {
+      "threshold_storage_utilization": 85,
+      "dds_path": "/mnt/dds/d",
+      "spatial_path": "/mnt/dds/d/Lam/Data/PMX/Spatial",
+      "is_retention_policy_enabled": true,
+      "retention_period_in_hours": 24,
+      "base_log_directory": "/mnt/storage/Lam/Data/PMX/Spatial/Logs/",
+      "log_source": "EdgeController_Retention_Archival",
+      "log_file": "EdgeController_Retention_Archival.log",
+      "pm": "PMX",
+      
+      "retention_policies": {
+        "diagnostic": {
+          "path": "/mnt/dds/d/Lam/Data/PMX/Spatial/Diagnostics",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["csv", "json", "txt"]
+        },
+        "log": {
+          "path": "/mnt/dds/d/Lam/Data/PMX/Spatial/Logs",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["log"]
+        },
+        "video_clips": {
+          "path": "/mnt/dds/d/Lam/Data/PMX/Spatial/VideoClips",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["mp4", "mkv"]
+        }
+      },
+      
+      "station_policies": {
+        "stations": ["Station1", "Station2", "Station3", "Station4"],
+        "video": {
+          "path_suffix": "/Videos",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["mp4", "mkv"]
+        },
+        "analysis": {
+          "path_suffix": "/Analysis",
+          "enabled": true,
+          "retention_hours": 96,
+          "file_types": ["parquet"]
+        }
+      }
+    }
+  }

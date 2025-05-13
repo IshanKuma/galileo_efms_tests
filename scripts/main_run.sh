@@ -3,11 +3,6 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# Kill any existing instances
-echo "Killing any existing EFMS_CPP_CODEBASE processes..."  
-sudo pkill EFMS_CPP_CODEBASE 2>/dev/null || true
-sudo pkill -f "sudo.*EFMS_CPP_CODEBASE" 2>/dev/null || true
-
 # Navigate to the root directory (one level up from scripts folder)
 cd "$(dirname "$0")/.."
 
