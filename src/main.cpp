@@ -32,9 +32,9 @@ private:
     int poll_interval_seconds;
     
     void loadConfig() {
-        std::ifstream configFile("config.json");
+        std::ifstream configFile("../configuration/config.json");
         if (!configFile.is_open()) {
-            throw std::runtime_error("Failed to open config.json");
+            throw std::runtime_error("Main - Failed to open config.json");
         }
         
         try {

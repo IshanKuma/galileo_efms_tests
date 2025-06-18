@@ -34,7 +34,7 @@ void ddsretentionpolicy::loadConfig() {
     
     std::ifstream configFile("config.json");
     if (!configFile.is_open()) {
-        throw std::runtime_error("Failed to open config.json");
+        throw std::runtime_error("DDS Retention - Failed to open config.json");
     }
     
     try {

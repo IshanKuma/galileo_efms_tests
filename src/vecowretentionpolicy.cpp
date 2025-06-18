@@ -32,9 +32,9 @@ static bool config_loaded = false;
 void vecowretentionpolicy::loadConfig() {
     if (config_loaded) return;
     
-    std::ifstream configFile("../configuration/config.json");
+    std::ifstream configFile("config.json");
     if (!configFile.is_open()) {
-        throw std::runtime_error("Failed to open config.json");
+        throw std::runtime_error("Vecow Retention-Failed to open config.json");
     }
     
     try {

@@ -70,3 +70,12 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     ${MODBUS_CFLAGS_OTHER}
     ${ZMQ_CFLAGS_OTHER}
 )
+
+# ======================================================================
+# Enable and Add Test Suite
+# ======================================================================
+enable_testing()
+
+add_subdirectory(tests)
+
+# Config file copying is handled in tests/CMakeLists.txt
